@@ -2,9 +2,21 @@
 
 import Link from 'next/link';
 import React, { useState } from 'react';
+import { gql } from "@apollo/client";
+
+const LOGIN = gql`
+  mutation Login($email: String!, $password: String!) {
+    login(email: $email, password: $password) {
+      _id
+      employeeId
+      name
+      position
+      token
+    }
+  }
+`;
 
 const login = () => {
-
   const [email , setEmail] = useState('');
   const [password , setPassword] = useState('');
 
@@ -16,10 +28,24 @@ const login = () => {
       password
     };
 
-    console.log(obj);
+    // setEmail('');
+    // setPassword('');
 
-    // setEmail('')
-    // setPassword('')
+    const userLogin = async () => {
+      const response = await fetch('http://localhost:4000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: LOGIN.loc?.source.body,
+          variables: obj
+        })
+      });
+      const data = await response.json();
+
+      // document.cookie = `token=${data.data.login.token}`;
+      console.log(data.data.login.token)
+    };
+    userLogin();
   };
 
   return (

@@ -1,10 +1,9 @@
 'use client'
 
 import React, { useState } from 'react';
-
 import { gql } from "@apollo/client";
 
-const mutation = gql`
+const CREATE_COMPANY = gql`
   mutation CreateCompany($name: String!, $employee: EmployeeInput) {
     createCompany(name: $name, employee: $employee) {
       _id
@@ -42,21 +41,20 @@ const create = () => {
         email: email,
         password: password
       }
-    }
+    };
 
-    const fetchData = async () => {
+    const createCompany = async () => {
       const response = await fetch('http://localhost:4000', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: mutation.loc?.source.body,
+          query: CREATE_COMPANY.loc?.source.body,
           variables: obj
         })
       });
       const data = await response.json();
     };
-  
-    fetchData();
+    createCompany();
   }
 
   return (

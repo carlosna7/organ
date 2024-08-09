@@ -2,9 +2,23 @@
 
 import Link from 'next/link';
 import React, { useState } from 'react'
+import { gql } from "@apollo/client";
+
+const REGISTER = gql`
+  mutation Register($name: String!, $position: String!, $email: String!, $password: String!) {
+    register(name: $name, position: $position, email: $email, password: $password) {
+      _id
+      employeeId
+      name
+      position
+      email
+      password
+      token
+    }
+  }
+`;
 
 const register = () => {
-
   const [name, setName] = useState('');
   const [position, setPosition] = useState('');
   const [email, setEmail] = useState('');
@@ -20,7 +34,24 @@ const register = () => {
       password: password
     }
 
-    console.log(obj)
+    // setName('');
+    // setPosition('');
+    // setEmail('');
+    // setPassword('');
+
+    const userRegister = async () => {
+      const response = await fetch('http://localhost:4000', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: REGISTER.loc?.source.body,
+          variables: obj
+        })
+      });
+      const data = await response.json();
+    };
+  
+    userRegister();
   }
 
   return (

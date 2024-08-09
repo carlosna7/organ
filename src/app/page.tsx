@@ -1,45 +1,9 @@
 'use client'
 
 import Link from 'next/link';
-import React, { useEffect } from 'react'
-
-import { gql } from "@apollo/client";
+import React from 'react'
 
 const Home = () => {
-
-  const query = gql`
-    query GetCompanies {
-      getCompanies {
-        _id
-        companyId
-        name
-        employees {
-          employeeId
-          name
-          position
-          email
-          password
-        }
-      }
-    }
-  `;
-  
-  useEffect(() => {
-    const fetchData = async () => {
-
-      const response = await fetch('http://localhost:4000', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: query.loc?.source.body
-        })
-      });
-      const data = await response.json();
-      console.log(data);
-    };
-  
-    fetchData();
-  }, []);
 
   return (
     <>
