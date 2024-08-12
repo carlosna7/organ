@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { gql } from "@apollo/client";
+import { useRouter } from 'next/navigation';
 
 const LOGIN = gql`
   mutation Login($email: String!, $password: String!) {
@@ -19,6 +20,7 @@ const LOGIN = gql`
 const login = () => {
   const [email , setEmail] = useState('');
   const [password , setPassword] = useState('');
+  const route = useRouter()
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -41,9 +43,13 @@ const login = () => {
         })
       });
       const data = await response.json();
-
-      // document.cookie = `token=${data.data.login.token}`;
-      console.log(data.data.login.token)
+      if (data.errors) {
+        console.log(data.errors[0].message);
+      } else {
+        console.log(data.data);
+        localStorage.setItem('organ-token', data.data.login.token);
+        route.push('/dashboard');
+      }
     };
     userLogin();
   };
@@ -71,7 +77,7 @@ const login = () => {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button type="submit">Enviar</button>
-          <Link href="/pages/register">Cadastrar-se</Link>
+          <Link href="/register">Cadastrar-se</Link>
         </form>
       </div>
     </main>

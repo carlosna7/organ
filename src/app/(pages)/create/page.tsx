@@ -53,6 +53,11 @@ const create = () => {
         })
       });
       const data = await response.json();
+      if (data.errors) {
+        console.log(data.errors[0].message);
+      } else {
+        console.log(data.data);
+      }
     };
     createCompany();
   }

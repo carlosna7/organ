@@ -49,6 +49,11 @@ const register = () => {
         })
       });
       const data = await response.json();
+      if (data.errors) {
+        console.log(data.errors[0].message);
+      } else {
+        console.log(data.data);
+      }
     };
   
     userRegister();
@@ -87,7 +92,7 @@ const register = () => {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button type="submit">Enviar</button>
-          <Link href="/pages/login">cadastre-se </Link>
+          <Link href="/login">cadastre-se </Link>
         </form>
       </div>
 
