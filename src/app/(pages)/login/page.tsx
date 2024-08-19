@@ -4,6 +4,7 @@ import Link from 'next/link';
 import React, { useState } from 'react';
 import { gql } from "@apollo/client";
 import { useRouter } from 'next/navigation';
+import { jwtDecode } from "jwt-decode";
 
 const LOGIN = gql`
   mutation Login($email: String!, $password: String!) {
@@ -30,9 +31,6 @@ const login = () => {
       password
     };
 
-    // setEmail('');
-    // setPassword('');
-
     const userLogin = async () => {
       const response = await fetch('http://localhost:4000', {
         method: 'POST',
@@ -42,13 +40,18 @@ const login = () => {
           variables: obj
         })
       });
+
       const data = await response.json();
       if (data.errors) {
         console.log(data.errors[0].message);
       } else {
-        console.log(data.data);
-        localStorage.setItem('organ-token', data.data.login.token);
+        const token = data.data.login.token;
         route.push('/dashboard');
+        const decoded = jwtDecode(token);
+        if(decoded.exp){
+          const expirationDate = new Date(decoded.exp * 1000);
+          document.cookie = `organ-token=${token}; expires=${expirationDate.toUTCString()}; path=/`;
+        }
       }
     };
     userLogin();
