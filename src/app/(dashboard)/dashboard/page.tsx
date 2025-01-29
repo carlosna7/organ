@@ -1,9 +1,16 @@
 'use client'
 
-import React from 'react'
+import AuthContext from '@/components/tokenContext';
+import React, { useContext } from 'react'
 import { FaBars, FaUser } from "react-icons/fa6";
 
 const dashboard = () => {
+
+  const authContext = useContext(AuthContext)
+  if (!authContext) {
+    throw new Error("AuthContext must be used within an AuthProvider");
+  }
+  const { logoutToken } = authContext;
 
   return (
     <main className='flex h-screen w-screen bg-gray-200'>
@@ -28,7 +35,7 @@ const dashboard = () => {
           <ul className='flex gap-6'>
             <li className='text-3xl'><FaUser /></li>
             <li className='text-3xl'><FaUser /></li>
-            <li className='text-3xl'><FaUser /></li>
+            <li className='text-3xl' onClick={logoutToken}><FaUser /></li>
           </ul>
         </header>
         <section className='bg-white h-full w-full rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4'>

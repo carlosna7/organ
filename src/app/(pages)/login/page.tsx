@@ -1,18 +1,15 @@
 'use client'
 
 import Link from 'next/link';
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { gql } from "@apollo/client";
-import { useRouter } from 'next/navigation';
-import { jwtDecode } from "jwt-decode";
+import AuthContext from '@/components/tokenContext';
 
 const LOGIN = gql`
   mutation Login($email: String!, $password: String!) {
     login(email: $email, password: $password) {
-      _id
+      companyId
       employeeId
-      name
-      position
       token
     }
   }
@@ -21,37 +18,36 @@ const LOGIN = gql`
 const login = () => {
   const [email , setEmail] = useState('');
   const [password , setPassword] = useState('');
-  const route = useRouter()
+
+  const authContext = useContext(AuthContext)
+  if (!authContext) {
+    throw new Error("AuthContext must be used within an AuthProvider");
+  }
+  const { loginToken } = authContext;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    const obj = {
-      email,
-      password
-    };
 
     const userLogin = async () => {
       const response = await fetch('http://localhost:4000', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           query: LOGIN.loc?.source.body,
-          variables: obj
+          variables: {
+            email,
+            password
+          }
         })
       });
-
+      
       const data = await response.json();
       if (data.errors) {
         console.log(data.errors[0].message);
       } else {
         const token = data.data.login.token;
-        route.push('/dashboard');
-        const decoded = jwtDecode(token);
-        if(decoded.exp){
-          const expirationDate = new Date(decoded.exp * 1000);
-          document.cookie = `organ-token=${token}; expires=${expirationDate.toUTCString()}; path=/`;
-        }
+        loginToken(token);
       }
     };
     userLogin();
@@ -74,7 +70,7 @@ const login = () => {
           />
           <label>senha</label>
           <input
-            type='pass'
+            type='current-password'
             value={password}
             placeholder='Digite sua senha'
             onChange={(e) => setPassword(e.target.value)}

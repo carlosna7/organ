@@ -1,3 +1,5 @@
+import { AuthProvider } from "@/components/tokenContext"
+
 export default function  PagesLayout({
   children,
 }: {
@@ -5,7 +7,9 @@ export default function  PagesLayout({
 }) {
   return (
     <>
-      {children}
+      <AuthProvider>
+        {children}
+      </AuthProvider>
     </>
   )
 }
