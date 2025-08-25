@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { gql } from "@apollo/client";
+import AuthContext from '@/components/tokenContext';
 
 const CREATE_COMPANY = gql`
   mutation CreateCompany($name: String!, $employee: EmployeeInput) {
@@ -12,23 +13,26 @@ const CREATE_COMPANY = gql`
       createdAt
       employees {
         _id
-        employeeId
         name
         position
         email
-        password
-        token
       }
     }
   }
 `;
 
-const create = () => {
+const createCompany = () => {
   const [company, setCompany] = useState('');
   const [name, setName] = useState('');
   const [position, setPosition] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  const firstAccessContext = useContext(AuthContext);
+  if (!firstAccessContext) {
+    throw new Error("AuthContext must be used within an AuthProvider");
+  }
+  const { createCookie } = firstAccessContext;
 
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -43,7 +47,7 @@ const create = () => {
       }
     };
 
-    const createCompany = async () => {
+    const createMyCompany = async () => {
       const response = await fetch('http://localhost:4000', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,12 +58,15 @@ const create = () => {
       });
       const data = await response.json();
       if (data.errors) {
-        console.log(data.errors[0].message);
+        console.log(data.errors[0]);
+        // Redirect para página 404
       } else {
         console.log(data.data);
+        createCookie();
       }
     };
-    createCompany();
+
+    createMyCompany();
   }
 
   return (
@@ -106,11 +113,10 @@ const create = () => {
             onChange={(e) => setPassword(e.target.value)}
           />
           <button type="submit">Enviar</button>
-          {/* <Link href="/pages/login">cadastre-se </Link> */}
         </form>
       </div>
     </main>
   )
 }
 
-export default create
+export default createCompany

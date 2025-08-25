@@ -1,86 +1,98 @@
 'use client'
 
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
 
 type AuthContextType = {
-  loginToken: (newToken: string) => void;
-  logoutToken: () => void;
-  token: tokenI | null;
+	createCookie: () => void;
+	logoutCookie: () => void;
 };
-
-interface tokenI {
-  eId: number;
-  cId: string;
-  exp: number;
-  iat: number;
-}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: any) => {
 
-  const [token, setToken] = useState<tokenI | null>(null); 
-  const pathname = usePathname();
-  const router = useRouter();
+	const pathname = usePathname();
+	const router = useRouter();
 
-  useEffect(() => {
-    checkCookie()
-  }, [])
+	const checkCookie = () => {
+		const cookie = document.cookie.split('; ').find((row) => row.startsWith('organ-auth-token='));
+		
+		if (pathname === '/dashboard') {
+			if(cookie) {
+				// verificar se o cookie não expirou
+				const token = cookie.split('=')[1];
+				const parts: string[] = token.split("-");
+				const timestampString: string | undefined = parts.pop();
 
-  useEffect(() => {
-    if(pathname !== '/dashboard' && token) {
-      logoutToken()
-    }
-  }, [pathname]);
+				if (!timestampString) return;
 
-  const checkCookie = () => {
-    console.log('checkCookie');
-    const cookie = document.cookie.split('; ').find((row) => row.startsWith('organ-auth-token='));
-    if(cookie) {
-      // verificar se o token é valido atravez de um middleware
-      const tokenValue = cookie.split('=')[1];
-      try {
-        const decodedToken = jwtDecode<tokenI>(tokenValue);
-        setToken(decodedToken);
-        console.log('Token verificado e decodificado');
-      } catch (error) {
-        console.error('Erro ao decodificar o token:', error);
-        logoutToken();
-      }
-    } else {
-      logoutToken()
-      console.log('Nenhum token encontrado');
-    }
-  };
+				const timestamp: number = parseInt(timestampString, 10);
+				const now: number = Date.now();
 
-  const loginToken = async (newToken: string) => {
-    console.log('login');
-    if(newToken) {
-      const decodedToken = jwtDecode<tokenI>(newToken)
-      setToken(decodedToken)
 
-      if(decodedToken) {
-        const expirationDate = new Date(decodedToken.exp * 1000);
-        document.cookie = `organ-auth-token=${newToken}; expires=${expirationDate.toUTCString()}; path=/`;
-        router.push('/dashboard');
-      }
-    }
-  };
+				if (now > timestamp) {
+					logoutCookie();
+				}
+			}
+		}
+		
+	};
 
-  const logoutToken = () => {
-    console.log('logout');
-    document.cookie = 'organ-auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    setToken(null);
-    router.push('/login');
-  };
-  
-  return (
-    <AuthContext.Provider value={{ loginToken, logoutToken, token }}>
-      {children}
-    </AuthContext.Provider>
-  );
+	const generateCode = async (): Promise<string> => {
+		const part1 = Math.floor(Math.random() * 9000 + 50000);
+		const part2 = Math.floor(Math.random() * 90000 + 7000000);
+		const part3 = Math.floor(Math.random() * 900 + 300);
+		const dateDow = Date.now() + 30 * 60 * 1000;
+
+		return `${part1}-${part2}-${part3}-${dateDow}`;
+	}
+
+	const createCookie = async (): Promise<void> => {
+		const newToken: string = await generateCode();
+		if (newToken) {
+			const parts: string[] = newToken.split("-");
+			const timestampString: string | undefined = parts.pop();
+
+			if (!timestampString) {
+				console.error("Erro: timestamp não encontrado no token.");
+				return;
+			}
+
+			const timestamp: number = parseInt(timestampString, 10);
+			if (isNaN(timestamp)) {
+				console.error("Erro: timestamp inválido.");
+				return;
+			}
+
+			// Adiciona 30 minutos (em ms)
+			const expirationDate: Date = new Date(timestamp + 30 * 60 * 1000);
+
+			document.cookie = `organ-auth-token=${newToken}; expires=${expirationDate.toUTCString()}; path=/`;
+
+			router.push('/dashboard');
+		}
+	};
+
+	const logoutCookie = async (): Promise<void> => {
+		
+		document.cookie = 'organ-auth-token=; path=/;';
+		router.push('/login');
+	};
+
+	useEffect(() => {
+		if (pathname !== '/dashboard') {
+			document.cookie = 'organ-auth-token=; path=/;';
+		}
+		checkCookie()
+
+	}, [pathname]);
+
+	return (
+		<AuthContext.Provider value={{ createCookie, logoutCookie }}>
+			{children}
+		</AuthContext.Provider>
+	);
 };
 
 export default AuthContext;

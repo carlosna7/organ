@@ -10,7 +10,7 @@ const dashboard = () => {
   if (!authContext) {
     throw new Error("AuthContext must be used within an AuthProvider");
   }
-  const { logoutToken } = authContext;
+  const { logoutCookie } = authContext;
 
   return (
     <main className='flex h-screen w-screen bg-gray-200'>
@@ -35,7 +35,7 @@ const dashboard = () => {
           <ul className='flex gap-6'>
             <li className='text-3xl'><FaUser /></li>
             <li className='text-3xl'><FaUser /></li>
-            <li className='text-3xl' onClick={logoutToken}><FaUser /></li>
+            <li className='text-3xl' onClick={logoutCookie}><FaUser /></li>
           </ul>
         </header>
         <section className='bg-white h-full w-full rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4'>
