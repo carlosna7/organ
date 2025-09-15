@@ -1,66 +1,73 @@
-'use client'
-
 import Link from 'next/link';
-import React, { useContext, useState } from 'react';
-import { gql } from "@apollo/client";
-import AuthContext from '@/components/tokenContext';
+import { redirect, RedirectType } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { generateSecureToken, AUTH_COOKIE_CONFIG } from '@/lib/auth';
 
-const LOGIN = gql`
-  mutation Login($email: String!, $password: String!) {
-    login(email: $email, password: $password) {
-		_id
-		employeeId
-		name
-		position
-		email
-		company {
-			_id
-			companyId
-			name
-		}
-    }
-  }
-`;
+// Server Action para lidar com o login
+async function loginAction(formData: FormData) {
+	'use server';
 
-const login = () => {
-	const [email, setEmail] = useState('');
-	const [password, setPassword] = useState('');
+	const email = formData.get('email') as string;
+	const password = formData.get('password') as string;
 
-	const authContext = useContext(AuthContext)
-	if (!authContext) {
-		throw new Error("AuthContext must be used within an AuthProvider");
+	if (!email || !password) {
+		redirect('/login?error=missing_fields');
 	}
-	const { createCookie } = authContext;
 
-	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
+	const LOGIN_QUERY = `
+    mutation Login($email: String!, $password: String!) {
+      login(email: $email, password: $password) {
+        _id
+        employeeId
+        name
+        position
+        email
+        company {
+          _id
+          companyId
+          name
+        }
+      }
+    }
+  	`;
 
-		const userLogin = async () => {
-			const response = await fetch('http://localhost:4000', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				body: JSON.stringify({
-					query: LOGIN.loc?.source.body,
-					variables: {
-						email,
-						password
-					}
-				})
-			});
+	const response = await fetch('http://localhost:4000', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			query: LOGIN_QUERY,
+			variables: { email, password }
+		})
+	});
 
-			const data = await response.json();
-			console.log(data)
-			if (data.errors) {
-				console.log(data.errors[0]);
-				// Redirect para página 404
-			} else {
-				// console.log(data)
-				createCookie();
-			}
-		};
-		userLogin();
-	};
+	const data = await response.json();
+
+	if (data.errors) {
+		console.error('Login error:', data.errors[0]);
+		redirect('/login?error=invalid_credentials');
+	} else {
+		// Criar token seguro
+		const token = await generateSecureToken();
+
+		// Definir cookie httpOnly e secure
+		const cookieStore = cookies();
+		const expirationDate = new Date(Date.now() + AUTH_COOKIE_CONFIG.maxAge * 1000); // 30 minutos
+
+		cookieStore.set(AUTH_COOKIE_CONFIG.name, token, {
+			httpOnly: AUTH_COOKIE_CONFIG.httpOnly,
+			secure: AUTH_COOKIE_CONFIG.secure,
+			sameSite: AUTH_COOKIE_CONFIG.sameSite,
+			expires: expirationDate,
+			path: AUTH_COOKIE_CONFIG.path
+		});
+
+		redirect('/dashboard', RedirectType.push);
+	}
+}
+
+// Componente da página (Server Component)
+export default function LoginPage({ searchParams }: { searchParams: { error?: string };}) {
+	const error = searchParams?.error;
 
 	return (
 		<main className='flex h-screen w-screen'>
@@ -69,27 +76,37 @@ const login = () => {
 			</div>
 
 			<div className='flex justify-center items-center bg-blue-300 w-1/2'>
-				<form onSubmit={handleSubmit} className='flex flex-col gap-2'>
-					<label>email</label>
+				<form action={loginAction} className='flex flex-col gap-2'>
+					{error && (
+						<div className='text-red-500 mb-2'>
+							{error === 'missing_fields' && 'Por favor, preencha todos os campos.'}
+							{error === 'invalid_credentials' && 'Email ou senha inválidos.'}
+							{error === 'network_error' && 'Erro de conexão. Tente novamente.'}
+						</div>
+					)}
+
+					<label htmlFor="email">Email</label>
 					<input
-						type='email'
-						value={email}
-						placeholder='Digite seu email'
-						onChange={(e) => setEmail(e.target.value)}
+						id="email"
+						name="email"
+						type="email"
+						placeholder="Digite seu email"
+						required
 					/>
-					<label>senha</label>
+
+					<label htmlFor="password">Senha</label>
 					<input
-						type='current-password'
-						value={password}
-						placeholder='Digite sua senha'
-						onChange={(e) => setPassword(e.target.value)}
+						id="password"
+						name="password"
+						type="password"
+						placeholder="Digite sua senha"
+						required
 					/>
+
 					<button type="submit">Enviar</button>
 					<Link href="/register">Cadastrar-se</Link>
 				</form>
 			</div>
 		</main>
-	)
+	);
 }
-
-export default login
