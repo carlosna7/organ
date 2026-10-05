@@ -26,3 +26,8 @@ export const AUTH_ROUTES = ['/login', '/register', '/create-company'] as const;
 export const API_CONFIG = {
   graphqlEndpoint: process.env.GRAPHQL_URL || 'http://localhost:4000',
 } as const;
+
+/**
+ * Fuso horário (IANA) usado para exibir datas, independente do fuso do servidor
+ */
+export const APP_TIME_ZONE = process.env.APP_TIME_ZONE || 'America/Sao_Paulo';

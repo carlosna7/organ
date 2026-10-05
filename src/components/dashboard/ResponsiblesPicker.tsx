@@ -17,8 +17,9 @@ export default function ResponsiblesPicker({ employees, selected = {}, idPrefix 
     return <p className="text-sm text-slate-500">Nenhum funcionário registrado.</p>;
   }
 
+  // min-w-0 no fieldset: o padrão do navegador é min-width: min-content, o que impede o truncate
   return (
-    <fieldset className="flex flex-col gap-1.5">
+    <fieldset className="flex min-w-0 flex-col gap-1.5">
       <legend className="mb-1.5 text-sm font-medium text-slate-700">Responsáveis</legend>
       <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 bg-white">
         {employees.map(employee => {

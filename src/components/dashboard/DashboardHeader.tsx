@@ -31,9 +31,10 @@ export default function DashboardHeader({ companyName, me }: DashboardHeaderProp
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <div className="hidden text-right sm:block">
-            <p className="text-sm font-semibold text-slate-900">{displayName}</p>
-            <p className="text-xs text-slate-500">
+          {/* max-w + truncate: nome/email longo sem espaços não empurra o cabeçalho para fora da tela */}
+          <div className="hidden max-w-[14rem] text-right sm:block">
+            <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
+            <p className="truncate text-xs text-slate-500">
               {me.position ?? 'Sem cargo'} · {ROLE_LABELS[me.role]}
             </p>
           </div>

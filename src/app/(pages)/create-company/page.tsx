@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isValidEmail, MIN_PASSWORD_LENGTH, setAuthCookie } from '@/lib/auth';
+import { getErrorMessage } from '@/lib/errors';
 import { graphqlRequest } from '@/lib/graphql';
 import type { AuthPayload } from '@/lib/types';
 import Alert from '@/components/ui/Alert';
@@ -106,7 +107,7 @@ export default function CreateCompany({ searchParams }: { searchParams: { error?
 			}
 		>
 			<form action={handleSubmit} className="flex flex-col gap-5">
-				{error && <Alert>{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}</Alert>}
+				{error && <Alert>{getErrorMessage(ERROR_MESSAGES, error)}</Alert>}
 
 				<Input
 					id="company"

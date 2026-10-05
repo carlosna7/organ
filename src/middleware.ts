@@ -23,8 +23,9 @@ export async function middleware(request: NextRequest) {
   // Verificar se o usuário está tentando acessar uma rota protegida
   if (isProtectedRoute && !isValidToken) {
     // Sem token ou token inválido/expirado: remove cookie e redireciona para login
+    // (token inválido/expirado avisa que a sessão expirou)
     url.pathname = '/login';
-    url.search = '';
+    url.search = token ? '?error=session_expired' : '';
     const response = NextResponse.redirect(url);
     if (token) response.cookies.delete(AUTH_COOKIE_CONFIG.name);
     return response;

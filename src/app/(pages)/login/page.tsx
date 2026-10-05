@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { setAuthCookie } from '@/lib/auth';
+import { getErrorMessage } from '@/lib/errors';
 import { graphqlRequest } from '@/lib/graphql';
 import type { AuthPayload } from '@/lib/types';
 import Alert from '@/components/ui/Alert';
@@ -94,7 +95,7 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
 			}
 		>
 			<form action={loginAction} className="flex flex-col gap-5">
-				{error && <Alert>{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}</Alert>}
+				{error && <Alert>{getErrorMessage(ERROR_MESSAGES, error)}</Alert>}
 
 				<Input id="email" name="email" type="email" label="Email" autoComplete="email" required />
 

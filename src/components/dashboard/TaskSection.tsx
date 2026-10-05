@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LuCalendar, LuCalendarCheck, LuInbox, LuListChecks } from 'react-icons/lu';
 import { deleteTaskAction } from '@/actions/tasks';
+import { APP_TIME_ZONE } from '@/lib/auth/config';
 import type { Employee, Task, TaskStatus } from '@/lib/types';
 import { LEADERSHIP_LEVEL_LABELS, TASK_STATUSES, TASK_STATUS_LABELS } from '@/lib/types';
 import Avatar from '@/components/ui/Avatar';
@@ -19,11 +20,11 @@ type TaskSectionProps = {
   status?: TaskStatus;
 };
 
-// Formata datas ISO 8601 para o padrão brasileiro
+// Formata datas ISO 8601 para o padrão brasileiro, no fuso configurado
 function formatDate(value: string | null) {
   if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('pt-BR');
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('pt-BR', { timeZone: APP_TIME_ZONE });
 }
 
 // Tarefas: filtro por status, criação e ações conforme a permissão
@@ -115,14 +116,15 @@ export default function TaskSection({ tasks, employees, me, status }: TaskSectio
                   className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-slate-300"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="min-w-0 flex-1 font-semibold text-slate-900">
+                    {/* break-words: nome sem espaços quebra dentro do card em vez de estourar a largura */}
+                    <h3 className="min-w-0 flex-1 break-words font-semibold text-slate-900">
                       <span className="mr-1.5 text-sm font-normal text-slate-500">#{task.taskId}</span>
                       {task.taskName}
                     </h3>
                     <StatusBadge status={task.status} />
                   </div>
                   {task.description && (
-                    <p className="-mt-1 whitespace-pre-line text-sm text-slate-600">{task.description}</p>
+                    <p className="-mt-1 whitespace-pre-line break-words text-sm text-slate-600">{task.description}</p>
                   )}
 
                   <ul className="flex flex-wrap gap-2 text-xs" aria-label="Responsáveis">
@@ -133,11 +135,12 @@ export default function TaskSection({ tasks, employees, me, status }: TaskSectio
                       return (
                         <li
                           key={responsible.employee?.employeeId ?? `removed-${index}`}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-0.5 pr-2.5"
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-0.5 pr-2.5"
                         >
                           <Avatar name={name} size="sm" />
-                          <span className="font-medium text-slate-700">{name}</span>
-                          <span className="text-slate-500">
+                          {/* truncate: nome/email longo vira reticências e o nível continua visível */}
+                          <span className="min-w-0 truncate font-medium text-slate-700">{name}</span>
+                          <span className="shrink-0 text-slate-500">
                             · {LEADERSHIP_LEVEL_LABELS[responsible.leadershipLevel] ?? `Nível ${responsible.leadershipLevel}`}
                           </span>
                         </li>

@@ -115,10 +115,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="break-words text-2xl font-bold tracking-tight text-slate-900">
             {firstName ? `Olá, ${firstName}` : 'Painel'}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">Acompanhe a equipe e as tarefas de {company.name}.</p>
+          <p className="mt-1 break-words text-sm text-slate-600">Acompanhe a equipe e as tarefas de {company.name}.</p>
         </div>
 
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

@@ -62,6 +62,7 @@ export default function TeamSection({ employees, me }: TeamSectionProps) {
                       label="Remover"
                       confirmLabel="Confirmar remoção"
                       accessibleLabel={`Remover ${displayName}`}
+                      confirmAccessibleLabel={`Confirmar remoção de ${displayName}`}
                     />
                   )}
                 </li>
@@ -95,8 +96,10 @@ export default function TeamSection({ employees, me }: TeamSectionProps) {
                       action={removeEmployeeAction}
                       fields={{ employeeId: employee.employeeId }}
                       label="Cancelar convite"
-                      confirmLabel="Confirmar"
+                      confirmLabel="Cancelar convite"
+                      cancelLabel="Manter convite"
                       accessibleLabel={`Cancelar convite de ${employee.email}`}
+                      confirmAccessibleLabel={`Cancelar convite de ${employee.email}`}
                     />
                   )}
                 </li>
