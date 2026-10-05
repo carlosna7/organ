@@ -1,57 +1,92 @@
-/**
- * Gera um token seguro para autenticação
- * @returns Promise<string> Token no formato: part1-part2-part3-timestamp
- */
-export async function generateSecureToken(): Promise<string> {
-  const part1 = Math.floor(Math.random() * 9000 + 50000);
-  const part2 = Math.floor(Math.random() * 90000 + 7000000);
-  const part3 = Math.floor(Math.random() * 900 + 300);
-  const expirationTime = Date.now() + 30 * 60 * 1000; // 30 minutos
+// Subpaths evitam importar o JWE (APIs não suportadas no edge)
+import { jwtVerify } from 'jose/jwt/verify';
+import { decodeJwt } from 'jose/jwt/decode';
 
-  return `${part1}-${part2}-${part3}-${expirationTime}`;
+/**
+ * Dados gravados no JWT pela API
+ */
+export type AuthTokenPayload = {
+  sub: string; // Employee._id
+  company: string; // Company._id
+  role: 'leader' | 'member';
+  employeeId: number;
+  name: string;
+  email: string;
+  exp?: number;
+};
+
+/**
+ * Obtém a chave usada para verificar o JWT (HS256)
+ * @returns Uint8Array | null - Chave ou null se JWT_SECRET não estiver definido
+ */
+function getJwtSecret(): Uint8Array | null {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.error('JWT_SECRET não definido: não é possível validar tokens.');
+    return null;
+  }
+  return new TextEncoder().encode(secret);
+}
+
+/**
+ * Verifica a assinatura e a validade do token e devolve o payload
+ * Funciona no middleware (edge) e no servidor
+ * @param token - JWT recebido da API
+ * @returns Promise<AuthTokenPayload | null> - Payload ou null se inválido/expirado
+ */
+export async function verifyToken(token: string): Promise<AuthTokenPayload | null> {
+  if (!token) return null;
+
+  const secret = getJwtSecret();
+  if (!secret) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
+
+    // Verifica se o payload tem o formato do contrato
+    if (
+      typeof payload.sub !== 'string' ||
+      typeof payload.company !== 'string' ||
+      (payload.role !== 'leader' && payload.role !== 'member') ||
+      typeof payload.employeeId !== 'number'
+    ) {
+      return null;
+    }
+
+    return {
+      sub: payload.sub,
+      company: payload.company,
+      role: payload.role,
+      employeeId: payload.employeeId,
+      name: typeof payload.name === 'string' ? payload.name : '',
+      email: typeof payload.email === 'string' ? payload.email : '',
+      exp: payload.exp,
+    };
+  } catch {
+    // Assinatura inválida, token malformado ou expirado
+    return null;
+  }
 }
 
 /**
  * Valida se um token está válido e não expirou
  * @param token - Token a ser validado
- * @returns boolean - true se válido, false caso contrário
+ * @returns Promise<boolean> - true se válido, false caso contrário
  */
-export function validateToken(token: string): boolean {
-  try {
-    if (!token) return false;
-    
-    const parts = token.split('-');
-    const timestampString = parts.pop();
-    
-    if (!timestampString) return false;
-    
-    const timestamp = parseInt(timestampString, 10);
-    if (isNaN(timestamp)) return false;
-    
-    const now = Date.now();
-    return now < timestamp;
-  } catch (error) {
-    console.error('Erro ao validar token:', error);
-    return false;
-  }
+export async function validateToken(token: string): Promise<boolean> {
+  return (await verifyToken(token)) !== null;
 }
 
 /**
- * Extrai o timestamp de expiração do token
+ * Extrai o timestamp de expiração do token (sem verificar a assinatura)
  * @param token - Token para extrair timestamp
- * @returns number | null - Timestamp de expiração ou null se inválido
+ * @returns number | null - Timestamp de expiração em ms ou null se inválido
  */
 export function getTokenExpiration(token: string): number | null {
   try {
-    const parts = token.split('-');
-    const timestampString = parts.pop();
-    
-    if (!timestampString) return null;
-    
-    const timestamp = parseInt(timestampString, 10);
-    return isNaN(timestamp) ? null : timestamp;
-  } catch (error) {
-    console.error('Erro ao extrair timestamp:', error);
+    const { exp } = decodeJwt(token);
+    return typeof exp === 'number' ? exp * 1000 : null;
+  } catch {
     return null;
   }
 }
@@ -64,8 +99,7 @@ export function getTokenExpiration(token: string): number | null {
 export function getTokenRemainingMinutes(token: string): number {
   const expiration = getTokenExpiration(token);
   if (!expiration) return -1;
-  
-  const now = Date.now();
-  const remainingMs = expiration - now;
+
+  const remainingMs = expiration - Date.now();
   return Math.floor(remainingMs / (1000 * 60));
 }

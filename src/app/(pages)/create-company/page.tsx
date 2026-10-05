@@ -1,122 +1,141 @@
-'use client'
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { isValidEmail, MIN_PASSWORD_LENGTH, setAuthCookie } from '@/lib/auth';
+import { graphqlRequest } from '@/lib/graphql';
+import type { AuthPayload } from '@/lib/types';
 
-import React, { useContext, useState } from 'react';
-import { gql } from "@apollo/client";
-import AuthContext from '@/components/tokenContext';
-
-const CREATE_COMPANY = gql`
-  mutation CreateCompany($name: String!, $employee: EmployeeInput) {
-    createCompany(name: $name, employee: $employee) {
-      _id
-      companyId
-      name
-      createdAt
-      employees {
-        _id
-        name
-        position
-        email
-      }
-    }
-  }
+const CREATE_COMPANY_MUTATION = `
+	mutation CreateCompany($name: String!, $employee: EmployeeInput!) {
+		createCompany(name: $name, employee: $employee) {
+			token
+			employee {
+				_id
+				employeeId
+				name
+			}
+		}
+	}
 `;
 
-const createCompany = () => {
-  const [company, setCompany] = useState('');
-  const [name, setName] = useState('');
-  const [position, setPosition] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  const firstAccessContext = useContext(AuthContext);
-  if (!firstAccessContext) {
-    throw new Error("AuthContext must be used within an AuthProvider");
-  }
-  const { createCookie } = firstAccessContext;
+// Mensagens exibidas conforme o código em ?error=
+const ERROR_MESSAGES: Record<string, string> = {
+	missing_fields: 'Por favor, preencha todos os campos.',
+	invalid_email: 'Email inválido.',
+	weak_password: `A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`,
+	company_exists: 'Já existe uma empresa com esse nome.',
+	email_exists: 'Este email já está cadastrado.',
+	invalid_data: 'Dados inválidos. Verifique os campos.',
+	network_error: 'Não foi possível conectar ao servidor. Tente novamente.',
+	server_error: 'Erro inesperado. Tente novamente.',
+};
 
-  const handleSubmit = async (ev: React.FormEvent) => {
-    ev.preventDefault();
+// Server Action para criar a empresa e o líder
+async function handleSubmit(formData: FormData) {
+	'use server';
 
-    const obj = {
-      name: company,
-      employee: {
-        name: name,
-        position: position,
-        email: email,
-        password: password
-      }
-    };
+	const company = String(formData.get('company') ?? '').trim();
+	const name = String(formData.get('name') ?? '').trim();
+	const position = String(formData.get('position') ?? '').trim();
+	const email = String(formData.get('email') ?? '').trim().toLowerCase();
+	const password = String(formData.get('password') ?? '');
 
-    const createMyCompany = async () => {
-      const response = await fetch('http://localhost:4000', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: CREATE_COMPANY.loc?.source.body,
-          variables: obj
-        })
-      });
-      const data = await response.json();
-      if (data.errors) {
-        console.log(data.errors[0]);
-        // Redirect para página 404
-      } else {
-        console.log(data.data);
-        createCookie();
-      }
-    };
+	// Verifica os campos antes de chamar a API
+	if (!company || !name || !position || !email || !password) redirect('/create-company?error=missing_fields');
+	if (!isValidEmail(email)) redirect('/create-company?error=invalid_email');
+	if (password.length < MIN_PASSWORD_LENGTH) redirect('/create-company?error=weak_password');
 
-    createMyCompany();
-  }
+	const { data, error } = await graphqlRequest<{ createCompany: AuthPayload }>(
+		CREATE_COMPANY_MUTATION,
+		{ name: company, employee: { name, position, email, password } },
+		{ auth: false }
+	);
 
-  return (
-    <main className='flex h-screen w-screen'>
-      <div className='flex justify-center items-center bg-gray-200 w-1/2'>
-        <p className='font-extrabold text-7xl'>IMAGEM</p>
-      </div>
+	// redirect() lança exceção, por isso fica fora de try/catch
+	if (error) {
+		if (error.code === 'NETWORK_ERROR') redirect('/create-company?error=network_error');
+		if (error.code === 'CONFLICT') {
+			// A API usa CONFLICT para empresa ou email já existentes; diferencia pela mensagem
+			const isCompanyConflict = /empresa/i.test(error.message);
+			redirect(`/create-company?error=${isCompanyConflict ? 'company_exists' : 'email_exists'}`);
+		}
+		if (error.code === 'BAD_USER_INPUT') redirect('/create-company?error=invalid_data');
+		console.error('Create company error:', error);
+		redirect('/create-company?error=server_error');
+	}
 
-      <div className='flex justify-center items-center bg-blue-300 w-1/2'>
-        <form onSubmit={handleSubmit} className='flex flex-col gap-2'>
-          <label>Empresa</label>
-          <input
-            type="name"
-            placeholder='insira sua empresa...'
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-          />
-          <label>Nome</label>
-          <input
-            type="name"
-            placeholder='insira seu nome...'
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <label>Cargo</label>
-          <input
-            type="position"
-            placeholder='insira seu cargo...'
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-          />
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder='insira seu email...'
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <label>Senha</label>
-          <input
-            type="pass"
-            placeholder='insira sua senha...'
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="submit">Enviar</button>
-        </form>
-      </div>
-    </main>
-  )
+	// Grava o JWT da API no cookie httpOnly
+	await setAuthCookie(data.createCompany.token);
+
+	redirect('/dashboard');
 }
 
-export default createCompany
+// Componente da página (Server Component)
+export default function CreateCompany({ searchParams }: { searchParams: { error?: string } }) {
+	const error = searchParams?.error;
+
+	return (
+		<main className='flex h-screen w-screen'>
+			<div className='flex justify-center items-center bg-gray-200 w-1/2'>
+				<p className='font-extrabold text-7xl'>IMAGEM</p>
+			</div>
+
+			<div className='flex justify-center items-center bg-blue-300 w-1/2'>
+				<form action={handleSubmit} className='flex flex-col gap-2'>
+					{error && (
+						<div className='text-red-600 mb-2'>
+							{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}
+						</div>
+					)}
+
+					<label htmlFor="company">Empresa</label>
+					<input
+						id="company"
+						name="company"
+						type="text"
+						placeholder='insira sua empresa...'
+						autoComplete="organization"
+						required
+					/>
+					<label htmlFor="name">Nome</label>
+					<input
+						id="name"
+						name="name"
+						type="text"
+						placeholder='insira seu nome...'
+						autoComplete="name"
+						required
+					/>
+					<label htmlFor="position">Cargo</label>
+					<input
+						id="position"
+						name="position"
+						type="text"
+						placeholder='insira seu cargo...'
+						required
+					/>
+					<label htmlFor="email">Email</label>
+					<input
+						id="email"
+						name="email"
+						type="email"
+						placeholder='insira seu email...'
+						autoComplete="email"
+						required
+					/>
+					<label htmlFor="password">Senha</label>
+					<input
+						id="password"
+						name="password"
+						type="password"
+						placeholder='insira sua senha...'
+						autoComplete="new-password"
+						minLength={MIN_PASSWORD_LENGTH}
+						required
+					/>
+					<button type="submit">Enviar</button>
+					<Link href="/login">Já tenho conta</Link>
+				</form>
+			</div>
+		</main>
+	);
+}

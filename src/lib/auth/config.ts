@@ -3,7 +3,7 @@
  */
 export const AUTH_COOKIE_CONFIG = {
   name: 'organ-auth-token',
-  maxAge: 30 * 60, // 30 minutos em segundos
+  maxAge: 8 * 60 * 60, // 8 horas em segundos (mesma validade do JWT)
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'strict' as const,
@@ -18,11 +18,11 @@ export const PROTECTED_ROUTES = ['/dashboard'] as const;
 /**
  * Lista de rotas de autenticação (login, register, etc.)
  */
-export const AUTH_ROUTES = ['/login', '/register'] as const;
+export const AUTH_ROUTES = ['/login', '/register', '/create-company'] as const;
 
 /**
- * URLs da API
+ * URLs da API (usadas só no servidor)
  */
 export const API_CONFIG = {
-  graphqlEndpoint: 'http://localhost:4000',
+  graphqlEndpoint: process.env.GRAPHQL_URL || 'http://localhost:4000',
 } as const;

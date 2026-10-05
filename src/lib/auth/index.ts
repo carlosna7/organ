@@ -3,11 +3,12 @@
 
 // Tokens
 export {
-  generateSecureToken,
+  verifyToken,
   validateToken,
   getTokenExpiration,
   getTokenRemainingMinutes,
 } from './tokens';
+export type { AuthTokenPayload } from './tokens';
 
 // Configurações
 export {
@@ -22,4 +23,9 @@ export {
   isAuthenticated,
   getUserData,
   getCurrentToken,
+  setAuthCookie,
+  clearAuthCookie,
+  isValidEmail,
+  MIN_PASSWORD_LENGTH,
 } from './validation';
+export type { AuthUser } from './validation';
