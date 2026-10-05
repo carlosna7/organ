@@ -1,8 +1,19 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isValidEmail, MIN_PASSWORD_LENGTH, setAuthCookie } from '@/lib/auth';
 import { graphqlRequest } from '@/lib/graphql';
 import type { AuthPayload } from '@/lib/types';
+import Alert from '@/components/ui/Alert';
+import AuthLayout from '@/components/ui/AuthLayout';
+import { textLinkStyles } from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import SubmitButton from '@/components/ui/SubmitButton';
+
+export const metadata: Metadata = {
+	title: 'Criar empresa',
+	description: 'Cadastre sua empresa no Organ e convide a equipe para organizar as tarefas.',
+};
 
 const CREATE_COMPANY_MUTATION = `
 	mutation CreateCompany($name: String!, $employee: EmployeeInput!) {
@@ -74,68 +85,64 @@ export default function CreateCompany({ searchParams }: { searchParams: { error?
 	const error = searchParams?.error;
 
 	return (
-		<main className='flex h-screen w-screen'>
-			<div className='flex justify-center items-center bg-gray-200 w-1/2'>
-				<p className='font-extrabold text-7xl'>IMAGEM</p>
-			</div>
+		<AuthLayout
+			title="Criar sua empresa"
+			description="Cadastre a empresa e a sua conta de líder. Depois é só convidar a equipe."
+			footer={
+				<div className="flex flex-col gap-2">
+					<p>
+						Já tem conta?{' '}
+						<Link href="/login" className={textLinkStyles}>
+							Entrar
+						</Link>
+					</p>
+					<p>
+						Sua empresa já usa o Organ?{' '}
+						<Link href="/register" className={textLinkStyles}>
+							Fui convidado
+						</Link>
+					</p>
+				</div>
+			}
+		>
+			<form action={handleSubmit} className="flex flex-col gap-5">
+				{error && <Alert>{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}</Alert>}
 
-			<div className='flex justify-center items-center bg-blue-300 w-1/2'>
-				<form action={handleSubmit} className='flex flex-col gap-2'>
-					{error && (
-						<div className='text-red-600 mb-2'>
-							{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}
-						</div>
-					)}
+				<Input
+					id="company"
+					name="company"
+					type="text"
+					label="Nome da empresa"
+					autoComplete="organization"
+					required
+				/>
 
-					<label htmlFor="company">Empresa</label>
-					<input
-						id="company"
-						name="company"
-						type="text"
-						placeholder='insira sua empresa...'
-						autoComplete="organization"
-						required
-					/>
-					<label htmlFor="name">Nome</label>
-					<input
-						id="name"
-						name="name"
-						type="text"
-						placeholder='insira seu nome...'
-						autoComplete="name"
-						required
-					/>
-					<label htmlFor="position">Cargo</label>
-					<input
-						id="position"
-						name="position"
-						type="text"
-						placeholder='insira seu cargo...'
-						required
-					/>
-					<label htmlFor="email">Email</label>
-					<input
-						id="email"
-						name="email"
-						type="email"
-						placeholder='insira seu email...'
-						autoComplete="email"
-						required
-					/>
-					<label htmlFor="password">Senha</label>
-					<input
+				<fieldset className="flex flex-col gap-5 rounded-xl border border-slate-200 p-4">
+					<legend className="px-1 text-sm font-semibold text-slate-900">Seus dados de líder</legend>
+
+					<div className="grid gap-5 sm:grid-cols-2">
+						<Input id="name" name="name" type="text" label="Nome" autoComplete="name" required />
+						<Input id="position" name="position" type="text" label="Cargo" autoComplete="organization-title" required />
+					</div>
+
+					<Input id="email" name="email" type="email" label="Email" autoComplete="email" required />
+
+					<Input
 						id="password"
 						name="password"
 						type="password"
-						placeholder='insira sua senha...'
+						label="Senha"
+						hint={`Mínimo de ${MIN_PASSWORD_LENGTH} caracteres.`}
 						autoComplete="new-password"
 						minLength={MIN_PASSWORD_LENGTH}
 						required
 					/>
-					<button type="submit">Enviar</button>
-					<Link href="/login">Já tenho conta</Link>
-				</form>
-			</div>
-		</main>
+				</fieldset>
+
+				<SubmitButton size="lg" fullWidth pendingText="Criando empresa...">
+					Criar empresa
+				</SubmitButton>
+			</form>
+		</AuthLayout>
 	);
 }

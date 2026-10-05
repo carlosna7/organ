@@ -4,8 +4,9 @@ import { useFormState } from 'react-dom';
 import { updateTaskStatusAction } from '@/actions/tasks';
 import type { TaskStatus } from '@/lib/types';
 import { TASK_STATUSES, TASK_STATUS_LABELS } from '@/lib/types';
+import { fieldStyles } from '@/components/ui/Input';
+import SubmitButton from '@/components/ui/SubmitButton';
 import FormError from './FormError';
-import SubmitButton from './SubmitButton';
 
 type TaskStatusFormProps = {
   taskId: number;
@@ -26,7 +27,7 @@ export default function TaskStatusForm({ taskId, status }: TaskStatusFormProps) 
           name="status"
           defaultValue={status}
           aria-label="Status da tarefa"
-          className="rounded border px-1 py-0.5 text-sm"
+          className={`${fieldStyles} !w-auto !py-1.5`}
         >
           {TASK_STATUSES.map(value => (
             <option key={value} value={value}>
@@ -34,7 +35,9 @@ export default function TaskStatusForm({ taskId, status }: TaskStatusFormProps) 
             </option>
           ))}
         </select>
-        <SubmitButton pendingText="...">Atualizar</SubmitButton>
+        <SubmitButton variant="secondary" size="sm" pendingText="Salvando...">
+          Atualizar
+        </SubmitButton>
       </div>
       <FormError message={state.error} />
     </form>

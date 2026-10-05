@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useFormState } from 'react-dom';
+import { LuPencil } from 'react-icons/lu';
 import { updateTaskAction } from '@/actions/tasks';
 import type { Employee, Task } from '@/lib/types';
+import Button from '@/components/ui/Button';
+import Input, { Textarea } from '@/components/ui/Input';
+import SubmitButton from '@/components/ui/SubmitButton';
 import FormError from './FormError';
 import ResponsiblesPicker from './ResponsiblesPicker';
-import SubmitButton from './SubmitButton';
 
 type TaskEditFormProps = {
   task: Task;
@@ -25,13 +28,10 @@ export default function TaskEditForm({ task, employees }: TaskEditFormProps) {
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded px-3 py-1 text-sm text-blue-700 hover:bg-blue-50"
-      >
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)} aria-label={`Editar a tarefa ${task.taskName}`}>
+        <LuPencil aria-hidden="true" className="h-3.5 w-3.5" />
         Editar
-      </button>
+      </Button>
     );
   }
 
@@ -42,45 +42,43 @@ export default function TaskEditForm({ task, employees }: TaskEditFormProps) {
   }
 
   return (
-    <form action={formAction} className="mt-2 flex w-full flex-col gap-2 rounded border bg-gray-50 p-3">
+    <form
+      action={formAction}
+      data-edit-form
+      aria-label={`Editar a tarefa ${task.taskName}`}
+      className="flex w-full flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
+    >
       <input type="hidden" name="taskId" value={task.taskId} />
 
-      <label htmlFor={`edit-task-${task.taskId}-name`} className="text-sm font-medium">
-        Nome
-      </label>
-      <input
+      <Input
         id={`edit-task-${task.taskId}-name`}
         name="taskName"
         type="text"
+        label="Nome da tarefa"
         defaultValue={task.taskName}
         required
-        className="rounded border px-2 py-1 text-sm"
       />
 
-      <label htmlFor={`edit-task-${task.taskId}-description`} className="text-sm font-medium">
-        Descrição
-      </label>
-      <textarea
+      <Textarea
         id={`edit-task-${task.taskId}-description`}
         name="description"
         rows={2}
+        label="Descrição"
         defaultValue={task.description ?? ''}
-        className="rounded border px-2 py-1 text-sm"
       />
 
       <ResponsiblesPicker employees={employees} selected={selected} idPrefix={`edit-task-${task.taskId}`} />
 
-      <div className="flex gap-2">
-        <SubmitButton pendingText="Salvando...">Salvar</SubmitButton>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="rounded px-3 py-1 text-sm hover:bg-gray-100"
-        >
-          Cancelar
-        </button>
-      </div>
       <FormError message={state.error} />
+
+      <div className="flex flex-wrap gap-2">
+        <SubmitButton size="sm" pendingText="Salvando...">
+          Salvar
+        </SubmitButton>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+          Cancelar
+        </Button>
+      </div>
     </form>
   );
 }

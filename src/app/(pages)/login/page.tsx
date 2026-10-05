@@ -1,8 +1,19 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { setAuthCookie } from '@/lib/auth';
 import { graphqlRequest } from '@/lib/graphql';
 import type { AuthPayload } from '@/lib/types';
+import Alert from '@/components/ui/Alert';
+import AuthLayout from '@/components/ui/AuthLayout';
+import { textLinkStyles } from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import SubmitButton from '@/components/ui/SubmitButton';
+
+export const metadata: Metadata = {
+	title: 'Entrar',
+	description: 'Acesse o painel da sua empresa no Organ.',
+};
 
 const LOGIN_MUTATION = `
 	mutation Login($email: String!, $password: String!) {
@@ -62,44 +73,44 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
 	const error = searchParams?.error;
 
 	return (
-		<main className='flex h-screen w-screen'>
-			<div className='flex justify-center items-center bg-gray-200 w-1/2'>
-				<p className='font-extrabold text-7xl'>IMAGEM</p>
-			</div>
+		<AuthLayout
+			title="Entrar no Organ"
+			description="Acesse o painel da sua empresa para ver a equipe e as tarefas."
+			footer={
+				<div className="flex flex-col gap-2">
+					<p>
+						Recebeu um convite da sua empresa?{' '}
+						<Link href="/register" className={textLinkStyles}>
+							Fui convidado
+						</Link>
+					</p>
+					<p>
+						Quer organizar a sua equipe?{' '}
+						<Link href="/create-company" className={textLinkStyles}>
+							Criar minha empresa
+						</Link>
+					</p>
+				</div>
+			}
+		>
+			<form action={loginAction} className="flex flex-col gap-5">
+				{error && <Alert>{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}</Alert>}
 
-			<div className='flex justify-center items-center bg-blue-300 w-1/2'>
-				<form action={loginAction} className='flex flex-col gap-2'>
-					{error && (
-						<div className='text-red-600 mb-2'>
-							{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}
-						</div>
-					)}
+				<Input id="email" name="email" type="email" label="Email" autoComplete="email" required />
 
-					<label htmlFor="email">Email</label>
-					<input
-						id="email"
-						name="email"
-						type="email"
-						placeholder="Digite seu email"
-						autoComplete="email"
-						required
-					/>
+				<Input
+					id="password"
+					name="password"
+					type="password"
+					label="Senha"
+					autoComplete="current-password"
+					required
+				/>
 
-					<label htmlFor="password">Senha</label>
-					<input
-						id="password"
-						name="password"
-						type="password"
-						placeholder="Digite sua senha"
-						autoComplete="current-password"
-						required
-					/>
-
-					<button type="submit">Enviar</button>
-					<Link href="/register">Cadastrar-se</Link>
-					<Link href="/create-company">Cadastrar empresa</Link>
-				</form>
-			</div>
-		</main>
+				<SubmitButton size="lg" fullWidth pendingText="Entrando...">
+					Entrar
+				</SubmitButton>
+			</form>
+		</AuthLayout>
 	);
 }

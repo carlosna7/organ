@@ -3,18 +3,21 @@
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import type { ActionState } from '@/actions/types';
+import { buttonStyles } from '@/components/ui/Button';
+import SubmitButton from '@/components/ui/SubmitButton';
 import FormError from './FormError';
-import SubmitButton from './SubmitButton';
 
 type ConfirmActionFormProps = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   fields: Record<string, string | number>;
   label: string;
   confirmLabel: string;
+  // Nome do item para leitores de tela (ex.: "Remover Ana")
+  accessibleLabel?: string;
 };
 
 // Ação destrutiva em dois cliques (ex.: remover funcionário, excluir tarefa)
-export default function ConfirmActionForm({ action, fields, label, confirmLabel }: ConfirmActionFormProps) {
+export default function ConfirmActionForm({ action, fields, label, confirmLabel, accessibleLabel }: ConfirmActionFormProps) {
   const [state, formAction] = useFormState(action, {});
   const [confirming, setConfirming] = useState(false);
 
@@ -24,7 +27,8 @@ export default function ConfirmActionForm({ action, fields, label, confirmLabel 
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="rounded px-3 py-1 text-sm text-red-600 hover:bg-red-50"
+          aria-label={accessibleLabel}
+          className={buttonStyles({ variant: 'dangerGhost', size: 'sm' })}
         >
           {label}
         </button>
@@ -38,15 +42,15 @@ export default function ConfirmActionForm({ action, fields, label, confirmLabel 
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="rounded px-3 py-1 text-sm hover:bg-gray-100"
+          className={buttonStyles({ variant: 'ghost', size: 'sm' })}
         >
           Cancelar
         </button>
-        <SubmitButton className="bg-red-600 text-white hover:bg-red-700" pendingText="Aguarde...">
+        <SubmitButton variant="danger" size="sm" pendingText="Aguarde...">
           {confirmLabel}
         </SubmitButton>
       </div>

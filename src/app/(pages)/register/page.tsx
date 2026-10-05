@@ -1,8 +1,19 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isValidEmail, MIN_PASSWORD_LENGTH, setAuthCookie } from '@/lib/auth';
 import { graphqlRequest } from '@/lib/graphql';
 import type { AuthPayload } from '@/lib/types';
+import Alert from '@/components/ui/Alert';
+import AuthLayout from '@/components/ui/AuthLayout';
+import { textLinkStyles } from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import SubmitButton from '@/components/ui/SubmitButton';
+
+export const metadata: Metadata = {
+	title: 'Criar conta',
+	description: 'Recebeu um convite? Crie sua conta no Organ com o email convidado.',
+};
 
 const REGISTER_MUTATION = `
 	mutation Register($name: String!, $position: String!, $email: String!, $password: String!) {
@@ -70,59 +81,59 @@ export default function Register({ searchParams }: { searchParams: { error?: str
 	const error = searchParams?.error;
 
 	return (
-		<main className='flex h-screen w-screen'>
-			<div className='flex justify-center items-center bg-blue-300 w-1/2'>
-				<form action={handleSubmit} className='flex flex-col gap-2'>
-					{error && (
-						<div className='text-red-600 mb-2'>
-							{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}
-						</div>
-					)}
+		<AuthLayout
+			title="Criar sua conta"
+			description="Fui convidado: use o mesmo email que o líder da sua empresa cadastrou no convite."
+			footer={
+				<div className="flex flex-col gap-2">
+					<p>
+						Já tem conta?{' '}
+						<Link href="/login" className={textLinkStyles}>
+							Entrar
+						</Link>
+					</p>
+					<p>
+						Ainda não tem empresa no Organ?{' '}
+						<Link href="/create-company" className={textLinkStyles}>
+							Criar minha empresa
+						</Link>
+					</p>
+				</div>
+			}
+		>
+			<form action={handleSubmit} className="flex flex-col gap-5">
+				{error && <Alert>{ERROR_MESSAGES[error] ?? ERROR_MESSAGES.server_error}</Alert>}
 
-					<label htmlFor="name">Nome</label>
-					<input
-						id="name"
-						name="name"
-						type="text"
-						placeholder='insira seu nome...'
-						autoComplete="name"
-						required
-					/>
-					<label htmlFor="position">Cargo</label>
-					<input
-						id="position"
-						name="position"
-						type="text"
-						placeholder='insira seu cargo...'
-						required
-					/>
-					<label htmlFor="email">Email</label>
-					<input
-						id="email"
-						name="email"
-						type="email"
-						placeholder='insira o email convidado...'
-						autoComplete="email"
-						required
-					/>
-					<label htmlFor="password">Senha</label>
-					<input
-						id="password"
-						name="password"
-						type="password"
-						placeholder='insira sua senha...'
-						autoComplete="new-password"
-						minLength={MIN_PASSWORD_LENGTH}
-						required
-					/>
-					<button type="submit">Enviar</button>
-					<Link href="/login">Já tenho conta</Link>
-				</form>
-			</div>
+				<div className="grid gap-5 sm:grid-cols-2">
+					<Input id="name" name="name" type="text" label="Nome" autoComplete="name" required />
+					<Input id="position" name="position" type="text" label="Cargo" autoComplete="organization-title" required />
+				</div>
 
-			<div className='flex justify-center items-center bg-gray-200 w-1/2'>
-				<p className='font-extrabold text-7xl'>IMAGEM</p>
-			</div>
-		</main>
+				<Input
+					id="email"
+					name="email"
+					type="email"
+					label="Email convidado"
+					hint="O mesmo email que recebeu o convite."
+					autoComplete="email"
+					required
+				/>
+
+				<Input
+					id="password"
+					name="password"
+					type="password"
+					label="Senha"
+					hint={`Mínimo de ${MIN_PASSWORD_LENGTH} caracteres.`}
+					autoComplete="new-password"
+					minLength={MIN_PASSWORD_LENGTH}
+					required
+				/>
+
+				<SubmitButton size="lg" fullWidth pendingText="Criando conta...">
+					Criar conta
+				</SubmitButton>
+			</form>
+		</AuthLayout>
 	);
 }
