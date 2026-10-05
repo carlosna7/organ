@@ -35,6 +35,9 @@ O app abre em `http://localhost:3000`. Para fazer login, a API precisa estar no 
 | `npm run build` | `next build` | Build de produção. Não exige `JWT_SECRET`. |
 | `npm start` | `next start` | Serve o build de produção. Exige `JWT_SECRET`. |
 | `npm run lint` | `next lint` | Executa o ESLint. |
+| `npm run test:e2e` | `playwright test` | Testes E2E (veja [Testes E2E](#testes-e2e-playwright)). |
+| `npm run test:e2e:ui` | `playwright test --ui` | Testes E2E no modo interativo do Playwright. |
+| `npm run test:e2e:report` | `playwright show-report` | Abre o relatório HTML da última execução. |
 
 ## Variáveis de ambiente
 
@@ -185,3 +188,26 @@ Problemas comuns:
 | "Não foi possível conectar ao servidor" | A API não está rodando, ou o `GRAPHQL_URL` está errado. |
 | O login funciona, mas volta para `/login` com "Sua sessão expirou" | O `JWT_SECRET` do front é diferente do da API. |
 | "Este email não foi convidado por nenhuma empresa" em `/register` | O líder ainda não convidou esse email. Confira se é exatamente o mesmo. |
+
+## Testes E2E (Playwright)
+
+A suíte fica em `e2e/` e exercita o app pela interface. Ela é autocontida: o `playwright.config.ts` sobe sozinho
+
+- um MongoDB em memória (`mongodb-memory-server`) e a API de `../organ-api`, pelo script `e2e/support/start-api.mjs` (porta 4600);
+- o front em produção (`next build` + `next start`, porta 3600).
+
+Os dois recebem um `JWT_SECRET` só de teste (`e2e/support/env.ts`). O `.env` da API, o `.env.local` e o MongoDB Atlas não são usados. Cada teste cria a própria empresa, com nome e emails únicos.
+
+Pré-requisitos: `npm install` aqui e na `../organ-api`. Como navegador, os testes usam o Chromium do Playwright (`npx playwright install chromium`) ou, se ele não estiver instalado, o Google Chrome da máquina.
+
+```bash
+npm run test:e2e                          # suíte completa (projetos chromium e mobile)
+npx playwright test e2e/tasks.spec.ts     # um arquivo
+npm run test:e2e:ui                       # modo interativo
+npm run test:e2e:report                   # relatório HTML da última execução
+```
+
+- Projetos: `chromium` (desktop) roda todos os specs menos `layout.spec.ts`, que roda no projeto `mobile` (Pixel 5).
+- Variáveis opcionais: `ORGAN_API_DIR` (pasta da API), `E2E_API_PORT`, `E2E_FRONT_PORT`, `PW_CHANNEL` (`chrome` ou `chromium`), `E2E_SKIP_BUILD=1` (pula o `next build`).
+- Fora do CI, servidores que já estejam nas portas 4600 e 3600 são reaproveitados. O `next build` dos testes sobrescreve a pasta `.next`.
+- Testes com `test.fail()` e um comentário `// BUG:` documentam bugs conhecidos do app. Quando o bug for corrigido, o teste passa a acusar "expected to fail" e o `test.fail()` deve ser removido.
