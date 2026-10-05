@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 // Estilo comum de campos (input, textarea e select)
 export const fieldStyles =
@@ -69,6 +69,25 @@ export function Textarea({ id, label, hint, error, className, ...props }: Textar
         className={`${fieldStyles} resize-y ${className ?? ''}`}
         {...props}
       />
+    </FieldWrapper>
+  );
+}
+
+type SelectProps = FieldProps & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'id'>;
+
+// Lista de opções com label e mensagem
+export function Select({ id, label, hint, error, className, children, ...props }: SelectProps) {
+  return (
+    <FieldWrapper id={id} label={label} hint={hint} error={error}>
+      <select
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={hint || error ? `${id}-message` : undefined}
+        className={`${fieldStyles} ${className ?? ''}`}
+        {...props}
+      >
+        {children}
+      </select>
     </FieldWrapper>
   );
 }

@@ -1,12 +1,13 @@
 # Organ
 
-Frontend do Organ, um organizador de equipe e tarefas. O líder cria a empresa, convida a equipe pelo email e distribui tarefas com responsáveis e status. Os dados vêm da API GraphQL do projeto irmão `../organ-api`; este projeto não acessa o banco de dados.
+Frontend do Organ, um organizador de equipe e tarefas. O líder cria a empresa, convida a equipe pelo email, monta equipes e projetos e distribui tarefas com responsáveis e status. As tarefas podem ser vistas em lista, kanban (com arrastar e soltar) ou grade. Os dados vêm da API GraphQL do projeto irmão `../organ-api`; este projeto não acessa o banco de dados.
 
 ## Tecnologias
 
 - Next.js 14.2.35 (App Router), React 18 e TypeScript
 - Tailwind CSS 3, com a fonte Inter via `next/font/google`
 - `jose` para verificar o JWT no middleware (edge runtime)
+- `@dnd-kit/core` para arrastar e soltar os cards do kanban (mouse, toque e teclado)
 - `react-icons` e `server-only`
 - ESLint com `next/core-web-vitals`
 
@@ -38,6 +39,7 @@ O app abre em `http://localhost:3000`. Para fazer login, a API precisa estar no 
 | `npm run test:e2e` | `playwright test` | Testes E2E (veja [Testes E2E](#testes-e2e-playwright)). |
 | `npm run test:e2e:ui` | `playwright test --ui` | Testes E2E no modo interativo do Playwright. |
 | `npm run test:e2e:report` | `playwright show-report` | Abre o relatório HTML da última execução. |
+| `npm run seed:demo` | `node scripts/seed-demo.mjs` | Cria a empresa "Acme Demo" na API (padrão `http://localhost:4000`, ou `SEED_API_URL`) com membros, equipes, projetos e tarefas. Entre com `lia@demo.test`, senha `senha-demo-123`. Roda uma vez por banco. |
 
 ## Variáveis de ambiente
 
@@ -63,18 +65,30 @@ Sobre as variáveis da API:
 ## Fluxo de uso
 
 1. **Criar a empresa** em `/create-company`: nome da empresa e os dados do líder (nome, cargo, email e senha com no mínimo 6 caracteres). O nome da empresa é único ignorando maiúsculas e o email é único no sistema. Quem cria a empresa vira o **líder** e já entra no painel.
-2. **Entrar no dashboard** em `/dashboard`. Em telas largas, a equipe (membros e convites pendentes) fica à esquerda e as tarefas à direita, com filtro por status (Todas, Pendente, Em andamento, Concluída).
-3. **Convidar por email** (só o líder): no campo "Convidar por email". O convite apenas **registra o email no sistema**. **Nenhum email é enviado**: avise a pessoa por conta própria. O email aparece em "Convites pendentes" como "Aguardando cadastro".
+2. **Entrar no painel** em `/dashboard`. O painel tem cinco seções, no menu abaixo do cabeçalho:
+   - **Resumo** (padrão): indicadores de tarefas por status, "Minhas tarefas em aberto", progresso geral, projetos e equipes, e atalhos para cadastrar.
+   - **Tarefas**: criar, filtrar e acompanhar as tarefas (veja o item 5).
+   - **Projetos**: cards com o progresso de cada projeto, calculado pelas tarefas concluídas.
+   - **Equipes**: cards com os membros e os projetos de cada equipe.
+   - **Membros**: a empresa (registrados e convites pendentes), com as equipes de cada pessoa.
+3. **Convidar por email** (só o líder): botão "Convidar membro" na seção Membros (ou no Resumo). O convite apenas **registra o email no sistema**. **Nenhum email é enviado**: avise a pessoa por conta própria. O email aparece em "Convites pendentes" como "Aguardando cadastro".
 4. **O convidado se cadastra** em `/register` (link "Fui convidado" na tela de login), informando nome, cargo, **o mesmo email do convite** e uma senha. Ele entra como **membro**, direto no painel. Email que ninguém convidou é recusado.
-5. **Tarefas com responsáveis.** Qualquer pessoa da empresa cria tarefas em "Nova tarefa": nome, descrição opcional e responsáveis, cada um com um nível:
+5. **Tarefas com responsáveis.** Qualquer pessoa da empresa cria tarefas no botão "Nova tarefa", que abre uma janela (modal) com nome, descrição opcional, projeto opcional e responsáveis, cada um com um nível:
    - nível 3: Principal
    - nível 2: Apoio
    - nível 1: Acompanha
 
    Se nenhum responsável for marcado, quem criou a tarefa entra como responsável principal (nível 3). Só funcionários já cadastrados aparecem na lista de responsáveis.
-6. **Status.** Cada tarefa tem o status Pendente, Em andamento ou Concluída, alterado pelo seletor e pelo botão "Atualizar". A data "Concluída em" aparece quando a tarefa é concluída.
-7. **Gerenciar** (só o líder): editar nome, descrição e responsáveis de uma tarefa (ao menos um responsável), excluir tarefas, remover membros e cancelar convites. Ações destrutivas pedem uma segunda confirmação.
-8. **Logout** pelo botão "Sair" no cabeçalho do painel.
+
+   Na seção Tarefas, o seletor "Forma de visualização" alterna entre **Lista**, **Kanban** e **Grade**. A escolha fica guardada num cookie (`organ-task-layout`) e vale na próxima visita; `?layout=` na URL tem prioridade. Há filtro por **status** (Todas, Pendente, Em andamento, Concluída; só na lista e na grade) e por **projeto** (um projeto, "Todos os projetos" ou "Sem projeto").
+6. **Status e kanban.** Cada tarefa tem o status Pendente, Em andamento ou Concluída. Na lista e na grade, o status muda pelo seletor e pelo botão "Atualizar". No kanban há uma coluna por status e basta **arrastar o card** para outra coluna: a tela atualiza na hora e, se a API recusar a mudança, o card volta e aparece um aviso. Sem mouse, use o botão de mover do card (Espaço, setas e Espaço para soltar) ou o seletor "Mover a tarefa ... para". No celular, segure o card por um instante para arrastar. A data "Concluída em" aparece quando a tarefa é concluída.
+7. **Projetos e equipes** (só o líder cria, edita e exclui; todos veem). "Novo projeto" pede nome, descrição opcional e a equipe responsável opcional. "Nova equipe" pede nome, descrição opcional e os membros. Os nomes são únicos na empresa, ignorando maiúsculas. O progresso do projeto vem das tarefas dele, e "Ver tarefas" abre a lista filtrada pelo projeto. Excluir uma equipe mantém os projetos (ficam sem equipe) e excluir um projeto mantém as tarefas (ficam sem projeto).
+8. **Gerenciar** (só o líder): editar nome, descrição, projeto e responsáveis de uma tarefa (ao menos um responsável) pela janela "Editar tarefa", excluir tarefas, remover membros e cancelar convites. Ações destrutivas pedem uma segunda confirmação.
+9. **Logout** pelo botão "Sair" no cabeçalho do painel.
+
+### Janelas modais
+
+Todo cadastro e edição (tarefa, projeto, equipe e convite) acontece numa janela feita com o `<dialog>` nativo: o foco vai para o primeiro campo ao abrir e volta ao botão que abriu ao fechar, o Tab fica preso na janela, a página de trás fica inerte e sem rolagem, e a janela fecha com Esc, com o botão "Fechar", com "Cancelar" ou clicando no fundo. Erros de validação aparecem dentro da janela, que só fecha quando a ação dá certo. Os campos recomeçam em branco a cada abertura.
 
 ## Papéis e permissões
 
@@ -82,17 +96,19 @@ A tela mostra apenas os controles a que o usuário tem direito, e a API aplica a
 
 | Ação | Líder | Membro |
 | --- | --- | --- |
-| Ver a equipe, os convites pendentes e todas as tarefas da empresa | sim | sim |
-| Criar tarefa | sim | sim |
-| Mudar o status de uma tarefa | de qualquer tarefa | só das tarefas em que é responsável |
-| Editar tarefa (nome, descrição, responsáveis) | sim | não |
+| Ver os membros, os convites pendentes, as equipes, os projetos e todas as tarefas da empresa | sim | sim |
+| Criar tarefa (inclusive dentro de um projeto) | sim | sim |
+| Mudar o status de uma tarefa (inclusive arrastando no kanban) | de qualquer tarefa | só das tarefas em que é responsável |
+| Editar tarefa (nome, descrição, projeto, responsáveis) | sim | não |
 | Excluir tarefa | sim | não |
+| Criar, editar e excluir projetos | sim | não |
+| Criar, editar e excluir equipes | sim | não |
 | Convidar por email | sim | não |
 | Remover membro ou cancelar convite | sim, exceto a si mesmo | não |
 
 O líder é sempre quem criou a empresa. Não há como trocar de papel nem transferir a liderança. Um membro que cria uma tarefa e não se inclui nos responsáveis não poderá mudar o status dela depois.
 
-Quando o líder remove alguém, essa pessoa sai das tarefas em que era responsável e a sessão dela deixa de valer na próxima requisição (ela volta para `/login`).
+Quando o líder remove alguém, essa pessoa sai das tarefas em que era responsável e das equipes de que fazia parte, e a sessão dela deixa de valer na próxima requisição (ela volta para `/login`).
 
 ## Rotas
 
@@ -103,7 +119,7 @@ Quando o líder remove alguém, essa pessoa sai das tarefas em que era responsá
 | `/register` | `(pages)` | só deslogado | Cadastro de quem foi convidado. |
 | `/create-company` | `(pages)` | só deslogado | Criar empresa e conta de líder. |
 | `/logout` | `(pages)` | pública | Apaga o cookie e redireciona para `/login?error=session_expired`. Usada quando a API rejeita a sessão. |
-| `/dashboard` | `(dashboard)` | autenticado | Painel de equipe e tarefas. Aceita `?status=pendente`, `em_andamento` ou `concluida`. |
+| `/dashboard` | `(dashboard)` | autenticado | Painel. Aceita `?view=` (`resumo`, `tarefas`, `projetos`, `equipes` ou `membros`; o padrão é `resumo`), `?layout=` (`list`, `kanban` ou `grid`), `?status=` (`pendente`, `em_andamento` ou `concluida`; não vale no kanban) e `?project=` (o número do projeto ou `none`). Valores inválidos são ignorados. |
 
 Os grupos entre parênteses organizam as pastas e não aparecem na URL.
 
@@ -119,7 +135,9 @@ organ/
     ├── actions/               # Server Actions
     │   ├── auth.ts            #   logout
     │   ├── team.ts            #   convidar e remover funcionário
-    │   ├── tasks.ts           #   criar, editar, mudar status e excluir tarefa
+    │   ├── teams.ts           #   criar, editar e excluir equipe
+    │   ├── projects.ts        #   criar, editar e excluir projeto
+    │   ├── tasks.ts           #   criar, editar, mudar status (formulário e kanban) e excluir tarefa
     │   ├── helpers.ts         #   tratamento de erros da API e leitura dos formulários
     │   └── types.ts           #   tipo do estado devolvido às actions
     ├── app/
@@ -129,12 +147,14 @@ organ/
     │   ├── (pages)/           # login, register, create-company e logout (route handler)
     │   └── (dashboard)/       # dashboard (/dashboard)
     ├── components/
-    │   ├── ui/                # Alert, AuthLayout, Avatar, Badge, Button, Card, Input, Logo, SubmitButton
-    │   ├── dashboard/         # seções de equipe e tarefas, formulários e cabeçalho do painel
+    │   ├── ui/                # Alert, AuthLayout, Avatar, AvatarStack, Badge, Button, Card, EmptyState, Input (com Select), Logo, Modal, ProgressBar, SubmitButton
+    │   ├── dashboard/         # cabeçalho com menu, Overview (resumo), áreas de trabalho (tarefas, projetos, equipes, membros), kanban, cards e janelas de cadastro
     │   └── main/              # cabeçalho, rodapé e mockup da página inicial
     ├── lib/
     │   ├── auth/              # config (cookie, rotas, URL da API, fuso), tokens (jose), validation (cookie e usuário)
     │   ├── graphql.ts         # cliente GraphQL (somente servidor)
+    │   ├── dashboard-url.ts   # monta os endereços do painel (?view=, ?layout=, ?status=, ?project=)
+    │   ├── format.ts          # datas no fuso configurado, plural e progresso das tarefas
     │   ├── types.ts           # tipos do contrato da API e rótulos de status, papéis e níveis
     │   └── errors.ts          # mensagens de erro a partir do ?error= da URL
     └── types/                 # tipos de useFormState/useFormStatus (React canary)
@@ -144,7 +164,9 @@ Observações:
 
 - `login`, `register` e `create-company` têm suas Server Actions dentro do próprio `page.tsx`. Em caso de erro, redirecionam para a mesma página com `?error=<código>`, e a página traduz o código em mensagem.
 - As ações do painel (`src/actions`) devolvem `{ error }` ou `{ ok }` para os formulários (`useFormState`) e chamam `revalidatePath('/dashboard')` depois de cada alteração.
-- `/dashboard` é renderizado a cada requisição (`force-dynamic`) com uma única query GraphQL (`me`, `getCompany`, `getEmployees` e `getTasks`).
+- `/dashboard` é renderizado a cada requisição (`force-dynamic`) com uma única query GraphQL (`me`, `getCompany`, `getEmployees`, `getTasks`, `getProjects` e `getTeams`). As seções, o filtro de projeto e o de status são aplicados no servidor sobre esses dados. As datas das tarefas são formatadas no servidor (fuso `APP_TIME_ZONE`) antes de ir para os componentes de cliente.
+- Cada seção com cadastro tem um componente de cliente (`TasksWorkspace`, `ProjectsWorkspace`, `TeamsWorkspace` e `MembersWorkspace`) que guarda qual janela está aberta; os formulários das janelas usam `useFormState` com as mesmas Server Actions.
+- O kanban (`KanbanBoard`) usa `@dnd-kit/core` e a action `moveTaskAction`. O novo status aparece na hora (atualização otimista) e volta ao anterior se a API recusar.
 
 ## Autenticação
 
@@ -197,6 +219,8 @@ A suíte fica em `e2e/` e exercita o app pela interface. Ela é autocontida: o `
 - o front em produção (`next build` + `next start`, porta 3600).
 
 Os dois recebem um `JWT_SECRET` só de teste (`e2e/support/env.ts`). O `.env` da API, o `.env.local` e o MongoDB Atlas não são usados. Cada teste cria a própria empresa, com nome e emails únicos.
+
+Os arquivos de teste cobrem: autenticação (`auth`), membros (`team`), tarefas (`tasks`), formas de ver e arrastar (`kanban`), projetos (`projects`), equipes (`teams`), janelas modais (`modals`), resumo (`overview`), isolamento entre empresas (`isolation`), acessibilidade (`a11y-basics`) e layout no celular (`layout`).
 
 Pré-requisitos: `npm install` aqui e na `../organ-api`. Como navegador, os testes usam o Chromium do Playwright (`npx playwright install chromium`) ou, se ele não estiver instalado, o Google Chrome da máquina.
 

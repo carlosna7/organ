@@ -32,9 +32,25 @@ export type ApiTask = {
   taskName: string;
   description: string | null;
   status: TaskStatus;
+  project: { projectId: number; name: string } | null;
   createdAt: string;
   completedAt: string | null;
   responsibles: { leadershipLevel: number; employee: { employeeId: number; name: string | null } | null }[];
+};
+
+export type ApiTeam = {
+  teamId: number;
+  name: string;
+  description: string | null;
+  members: { employeeId: number; name: string | null }[];
+  projects: { projectId: number; name: string }[];
+};
+
+export type ApiProject = {
+  projectId: number;
+  name: string;
+  description: string | null;
+  team: { teamId: number; name: string } | null;
 };
 
 export type ApiEmployee = {
@@ -59,7 +75,19 @@ const AUTH_FIELDS = `token employee { employeeId role }`;
 
 const TASK_FIELDS = `
   taskId taskName description status createdAt completedAt
+  project { projectId name }
   responsibles { leadershipLevel employee { employeeId name } }
+`;
+
+const TEAM_FIELDS = `
+  teamId name description
+  members { employeeId name }
+  projects { projectId name }
+`;
+
+const PROJECT_FIELDS = `
+  projectId name description
+  team { teamId name }
 `;
 
 export class OrganApi {
@@ -151,7 +179,7 @@ export class OrganApi {
 
   async createTask(
     token: string,
-    task: { taskName: string; description?: string | null; responsibles?: ResponsibleInput[] }
+    task: { taskName: string; description?: string | null; projectId?: number | null; responsibles?: ResponsibleInput[] }
   ): Promise<ApiTask> {
     const data = await this.gql<{ createTask: ApiTask }>(
       `mutation ($task: TaskInput!) { createTask(task: $task) { ${TASK_FIELDS} } }`,
@@ -164,7 +192,7 @@ export class OrganApi {
   async updateTask(
     token: string,
     taskId: number,
-    task: { taskName?: string; description?: string | null; responsibles?: ResponsibleInput[] }
+    task: { taskName?: string; description?: string | null; projectId?: number | null; responsibles?: ResponsibleInput[] }
   ): Promise<ApiTask> {
     const data = await this.gql<{ updateTask: ApiTask }>(
       `mutation ($taskId: Int!, $task: TaskUpdateInput!) { updateTask(taskId: $taskId, task: $task) { ${TASK_FIELDS} } }`,
@@ -194,6 +222,44 @@ export class OrganApi {
 
   async getTask(token: string, taskId: number): Promise<ApiTask | undefined> {
     return (await this.getTasks(token)).find(task => task.taskId === taskId);
+  }
+
+  async createTeam(
+    token: string,
+    team: { name: string; description?: string | null; memberIds?: number[] }
+  ): Promise<ApiTeam> {
+    const data = await this.gql<{ createTeam: ApiTeam }>(
+      `mutation ($team: TeamInput!) { createTeam(team: $team) { ${TEAM_FIELDS} } }`,
+      { team },
+      token
+    );
+    return data.createTeam;
+  }
+
+  async getTeams(token: string): Promise<ApiTeam[]> {
+    const data = await this.gql<{ getTeams: ApiTeam[] }>(`query { getTeams { ${TEAM_FIELDS} } }`, {}, token);
+    return data.getTeams;
+  }
+
+  async createProject(
+    token: string,
+    project: { name: string; description?: string | null; teamId?: number | null }
+  ): Promise<ApiProject> {
+    const data = await this.gql<{ createProject: ApiProject }>(
+      `mutation ($project: ProjectInput!) { createProject(project: $project) { ${PROJECT_FIELDS} } }`,
+      { project },
+      token
+    );
+    return data.createProject;
+  }
+
+  async getProjects(token: string): Promise<ApiProject[]> {
+    const data = await this.gql<{ getProjects: ApiProject[] }>(
+      `query { getProjects { ${PROJECT_FIELDS} } }`,
+      {},
+      token
+    );
+    return data.getProjects;
   }
 
   async getEmployees(token: string): Promise<ApiEmployee[]> {

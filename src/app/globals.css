@@ -16,3 +16,27 @@
     @apply outline outline-2 outline-offset-2 outline-brand-500;
   }
 }
+
+/* Janelas modais (<dialog>): entrada suave, só para quem não pediu menos movimento */
+@media (prefers-reduced-motion: no-preference) {
+  dialog.modal[open] {
+    animation: modal-in 160ms ease-out;
+  }
+
+  dialog.modal[open]::backdrop {
+    animation: modal-backdrop-in 160ms ease-out;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}

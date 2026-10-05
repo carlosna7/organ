@@ -29,11 +29,18 @@ export async function visit(page: Page, url: string) {
   return response;
 }
 
-/** Abre o dashboard (opcionalmente com ?status=) e confere que não houve redirecionamento */
+/** Abre o dashboard (opcionalmente com ?view=, ?status=...) e confere que não houve redirecionamento */
 export async function openDashboard(page: Page, query = ''): Promise<void> {
   await visit(page, `/dashboard${query}`);
   await expect(page).toHaveURL(new RegExp(`/dashboard${escapeRegExp(query)}$`));
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+}
+
+export type DashboardView = 'resumo' | 'tarefas' | 'projetos' | 'equipes' | 'membros';
+
+/** Abre uma seção do dashboard pela URL (?view=), com filtros opcionais (ex.: "&status=pendente") */
+export async function openView(page: Page, view: DashboardView, extra = ''): Promise<void> {
+  await openDashboard(page, `?view=${view}${extra}`);
 }
 
 /** Grava o JWT da conta no cookie de sessão (o mesmo que o app grava após o login) */
@@ -77,12 +84,14 @@ export function waitForServerAction(page: Page) {
 
 /* ---------------------------------- Seções do dashboard ---------------------------------- */
 
-export const teamSection = (page: Page) => page.getByRole('region', { name: 'Equipe' });
-export const tasksSection = (page: Page) => page.getByRole('region', { name: 'Tarefas' });
+export const membersSection = (page: Page) => page.getByRole('region', { name: 'Membros', exact: true });
+export const tasksSection = (page: Page) => page.getByRole('region', { name: 'Tarefas', exact: true });
+export const projectsSection = (page: Page) => page.getByRole('region', { name: 'Projetos', exact: true });
+export const teamsSection = (page: Page) => page.getByRole('region', { name: 'Equipes', exact: true });
 
-/** Linha de um membro registrado na equipe (pelo email, que é único) */
+/** Linha de um membro registrado na seção Membros (pelo email, que é único) */
 export function memberRow(page: Page, email: string): Locator {
-  return teamSection(page)
+  return membersSection(page)
     .getByRole('listitem')
     .filter({ hasText: email })
     .filter({ hasNotText: 'Aguardando cadastro' });
@@ -90,7 +99,21 @@ export function memberRow(page: Page, email: string): Locator {
 
 /** Linha de um convite pendente */
 export function inviteRow(page: Page, email: string): Locator {
-  return teamSection(page).getByRole('listitem').filter({ hasText: email }).filter({ hasText: 'Aguardando cadastro' });
+  return membersSection(page).getByRole('listitem').filter({ hasText: email }).filter({ hasText: 'Aguardando cadastro' });
+}
+
+/** Card de um projeto (pelo título h3) */
+export function projectCard(page: Page, name: string): Locator {
+  return projectsSection(page)
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { level: 3, name, exact: true }) });
+}
+
+/** Card de uma equipe (pelo título h3) */
+export function teamCard(page: Page, name: string): Locator {
+  return teamsSection(page)
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { level: 3, name, exact: true }) });
 }
 
 /** Título h3 de uma tarefa: "#<id>" seguido do nome */
@@ -118,18 +141,61 @@ export function responsibleChips(card: Locator): Locator {
   return card.getByRole('list', { name: 'Responsáveis' }).getByRole('listitem');
 }
 
-/** Formulário "Nova tarefa" */
-export const newTaskForm = (page: Page) => page.getByRole('form', { name: 'Nova tarefa' });
+/* Janelas modais (<dialog>): o nome acessível é o título da janela */
 
-/** Formulário de edição de uma tarefa */
-export const editTaskForm = (page: Page, taskName: string) =>
-  page.getByRole('form', { name: `Editar a tarefa ${taskName}` });
+/** Janela "Nova tarefa" */
+export const newTaskForm = (page: Page) => page.getByRole('dialog', { name: 'Nova tarefa' });
+
+/** Janela de edição de tarefa */
+export const editTaskForm = (page: Page) => page.getByRole('dialog', { name: 'Editar tarefa' });
+
+/** Janela de convite de membro */
+export const inviteDialog = (page: Page) => page.getByRole('dialog', { name: 'Convidar membro' });
+
+/** Abre uma janela pelo botão da página e devolve a janela (espera ela aparecer) */
+export async function openDialog(page: Page, trigger: Locator, name: string): Promise<Locator> {
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
 
 /** Muda o status pelo seletor + botão "Atualizar" e espera o badge refletir */
 export async function changeStatus(card: Locator, label: 'Pendente' | 'Em andamento' | 'Concluída') {
   await card.getByRole('combobox', { name: 'Status da tarefa' }).selectOption({ label });
   await card.getByRole('button', { name: 'Atualizar' }).click();
   await expect(statusBadge(card)).toHaveText(label);
+}
+
+/* ------------------------------------------- Kanban ------------------------------------------- */
+
+export type StatusLabel = 'Pendente' | 'Em andamento' | 'Concluída';
+
+/** Coluna do kanban de um status (região com o nome do status) */
+export const kanbanColumn = (page: Page, status: StatusLabel) =>
+  tasksSection(page).getByRole('region', { name: status, exact: true });
+
+/** Cards (itens da lista) de uma coluna do kanban */
+export const kanbanCards = (page: Page, status: StatusLabel) =>
+  kanbanColumn(page, status).getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3 }) });
+
+/**
+ * Arrasta um card até uma coluna com o mouse, em vários passos (o arrastar só começa depois de
+ * o ponteiro andar alguns pixels, e a coluna de destino só é reconhecida em movimentos seguintes)
+ */
+export async function dragCardToColumn(page: Page, card: Locator, column: Locator): Promise<void> {
+  const from = await card.boundingBox();
+  const to = await column.boundingBox();
+  if (!from || !to) throw new Error('card ou coluna fora da tela');
+
+  // Pega o card pelo título (longe do seletor de status e dos botões)
+  const startX = from.x + from.width / 2;
+  const startY = from.y + 18;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 12, startY + 12, { steps: 4 });
+  await page.mouse.move(to.x + to.width / 2, to.y + Math.min(to.height / 2, 200), { steps: 20 });
+  await page.mouse.up();
 }
 
 /* ------------------------------------- Layout / console ------------------------------------- */

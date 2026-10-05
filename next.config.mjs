@@ -1,7 +1,14 @@
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_SERVER } from 'next/constants.js';
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  experimental: {
+    // O painel é dinâmico e muda por ação de outras pessoas: ao trocar de seção, sempre busca os dados
+    // atuais no servidor em vez de reaproveitar por 30 s a tela já visitada (que ignoraria, por exemplo,
+    // a forma de ver as tarefas guardada no cookie)
+    staleTimes: { dynamic: 0 },
+  },
+};
 
 /**
  * Valida a configuração obrigatória ao subir o servidor (next start / next dev)

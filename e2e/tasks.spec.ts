@@ -6,7 +6,8 @@ import {
   changeStatus,
   editTaskForm,
   newTaskForm,
-  openDashboard,
+  openDialog,
+  openView,
   responsibleChips,
   statusBadge,
   taskCard,
@@ -37,13 +38,13 @@ test.describe('Tarefas', () => {
     test('criar tarefa sem responsáveis: o criador vira o responsável principal', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
       await api.addMember(company, { firstName: 'Bruno' });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
-      // Sem tarefas, o formulário já começa aberto
-      const form = newTaskForm(page);
-      await expect(form).toBeVisible();
+      // Sem tarefas, a tela mostra o aviso e o cadastro só abre ao clicar no botão
+      await expect(newTaskForm(page)).toHaveCount(0);
       await expect(tasksSection(page).getByText('Nenhuma tarefa por aqui ainda')).toBeVisible();
       await expect(tasksCount(page)).toHaveText('0 tarefas');
+      const form = await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
 
       const name = `Planejar sprint ${uid()}`;
       await form.getByLabel('Nome da tarefa').fill(name);
@@ -55,7 +56,7 @@ test.describe('Tarefas', () => {
 
       const card = taskCard(page, name);
       await expect(card).toBeVisible();
-      // O formulário fecha e volta o botão "Nova tarefa"
+      // A janela fecha e volta o botão "Nova tarefa"
       await expect(form).toHaveCount(0);
       await expect(tasksSection(page).getByRole('button', { name: 'Nova tarefa' })).toBeVisible();
 
@@ -87,11 +88,9 @@ test.describe('Tarefas', () => {
       const davi = await api.addMember(company, { firstName: 'Davi' });
       const invite = await api.addInvite(company);
       await api.createTask(company.leader.token, { taskName: `Tarefa existente ${uid()}` });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
-      // Com tarefas, o formulário começa fechado
-      await tasksSection(page).getByRole('button', { name: 'Nova tarefa' }).click();
-      const form = newTaskForm(page);
+      const form = await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
 
       // Só funcionários registrados podem ser responsáveis (o convite pendente não aparece)
       await expect(form.getByRole('checkbox')).toHaveCount(4);
@@ -136,19 +135,23 @@ test.describe('Tarefas', () => {
 
     test('nome só com espaços não cria a tarefa', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
-      const form = newTaskForm(page);
+      const form = await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
       await form.getByLabel('Nome da tarefa').fill('    ');
       await form.getByRole('button', { name: 'Criar tarefa' }).click();
 
       await expect(form.getByRole('alert')).toHaveText('Informe o nome da tarefa.');
+      // A janela continua aberta para corrigir
+      await expect(form).toBeVisible();
+      await form.getByRole('button', { name: 'Cancelar' }).click();
+      await expect(form).toHaveCount(0);
       await expect(allTaskCards(page)).toHaveCount(0);
       expect(await api.getTasks(company.leader.token)).toEqual([]);
     });
     test('nome com HTML é exibido como texto (sem executar nada)', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
       const dialogs: string[] = [];
       page.on('dialog', dialog => {
         dialogs.push(dialog.message());
@@ -156,8 +159,9 @@ test.describe('Tarefas', () => {
       });
 
       const name = `<img src=x onerror="alert('xss')"><b>negrito</b> ${uid()}`;
-      await newTaskForm(page).getByLabel('Nome da tarefa').fill(name);
-      await newTaskForm(page).getByRole('button', { name: 'Criar tarefa' }).click();
+      const form = await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
+      await form.getByLabel('Nome da tarefa').fill(name);
+      await form.getByRole('button', { name: 'Criar tarefa' }).click();
 
       const card = taskCard(page, name);
       await expect(card.getByRole('heading', { level: 3 })).toContainText(name);
@@ -170,17 +174,17 @@ test.describe('Tarefas', () => {
     test('reabrir "Nova tarefa" não mostra o erro da tentativa anterior', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
       await api.createTask(company.leader.token, { taskName: `Existente ${uid()}` });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       const trigger = tasksSection(page).getByRole('button', { name: 'Nova tarefa' });
-      await trigger.click();
+      await openDialog(page, trigger, 'Nova tarefa');
       await newTaskForm(page).getByLabel('Nome da tarefa').fill('   ');
       await newTaskForm(page).getByRole('button', { name: 'Criar tarefa' }).click();
       await expect(newTaskForm(page).getByRole('alert')).toHaveText('Informe o nome da tarefa.');
       await newTaskForm(page).getByRole('button', { name: 'Cancelar' }).click();
       await expect(newTaskForm(page)).toHaveCount(0);
 
-      await trigger.click();
+      await openDialog(page, trigger, 'Nova tarefa');
       await expect(newTaskForm(page).getByLabel('Nome da tarefa')).toHaveValue('');
       await expect(newTaskForm(page).getByRole('alert'), 'erro antigo no formulário reaberto').toHaveCount(0, {
         timeout: 3_000,
@@ -190,10 +194,10 @@ test.describe('Tarefas', () => {
     test('reabrir "Editar" não mostra o erro da tentativa anterior', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
       const task = await api.createTask(company.leader.token, { taskName: `Editar ${uid()}` });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       const trigger = taskCard(page, task.taskName).getByRole('button', { name: `Editar a tarefa ${task.taskName}` });
-      const form = editTaskForm(page, task.taskName);
+      const form = editTaskForm(page);
       await trigger.click();
       for (const checkbox of await form.getByRole('checkbox').all()) await checkbox.uncheck();
       await form.getByRole('button', { name: 'Salvar' }).click();
@@ -211,7 +215,7 @@ test.describe('Tarefas', () => {
     test('mudar status até concluída (data de conclusão aparece) e voltar', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
       const task = await api.createTask(company.leader.token, { taskName: `Publicar site ${uid()}` });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       const card = taskCard(page, task.taskName);
       const select = card.getByRole('combobox', { name: 'Status da tarefa' });
@@ -232,7 +236,7 @@ test.describe('Tarefas', () => {
       expect(completed?.completedAt).toEqual(expect.any(String));
 
       // Persistido após recarregar
-      await openDashboard(page);
+      await openView(page, 'tarefas');
       await expect(statusBadge(card)).toHaveText('Concluída');
       await expect(completedAtText(card)).toBeVisible();
 
@@ -254,7 +258,7 @@ test.describe('Tarefas', () => {
       const done = await api.createTask(token, { taskName: `Concluída ${uid()}` });
       await api.setTaskStatus(token, doing.taskId, 'em_andamento');
       await api.setTaskStatus(token, done.taskId, 'concluida');
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       const filters = statusFilter(page);
       await expect(filters.getByRole('link', { name: 'Todas' })).toHaveAttribute('aria-current', 'page');
@@ -269,7 +273,7 @@ test.describe('Tarefas', () => {
       for (const { link, query, visible } of cases) {
         await test.step(link, async () => {
           await filters.getByRole('link', { name: link, exact: true }).click();
-          await expect(page).toHaveURL(new RegExp(`/dashboard\\?status=${query}$`));
+          await expect(page).toHaveURL(new RegExp(`/dashboard\\?view=tarefas&layout=list&status=${query}$`));
           await expect(filters.getByRole('link', { name: link, exact: true })).toHaveAttribute('aria-current', 'page');
           await expect(filters.getByRole('link', { name: 'Todas' })).not.toHaveAttribute('aria-current');
           await expect(allTaskCards(page)).toHaveCount(1);
@@ -279,12 +283,12 @@ test.describe('Tarefas', () => {
       }
 
       await filters.getByRole('link', { name: 'Todas' }).click();
-      await expect(page).toHaveURL(/\/dashboard$/);
+      await expect(page).toHaveURL(/\/dashboard\?view=tarefas&layout=list$/);
       await expect(allTaskCards(page)).toHaveCount(3);
 
       // Mudar o status dentro do filtro tira a tarefa da lista filtrada
       await filters.getByRole('link', { name: 'Pendente', exact: true }).click();
-      await expect(page).toHaveURL(/\/dashboard\?status=pendente$/);
+      await expect(page).toHaveURL(/\/dashboard\?view=tarefas&layout=list&status=pendente$/);
       const card = taskCard(page, pending.taskName);
       await card.getByRole('combobox', { name: 'Status da tarefa' }).selectOption({ label: 'Em andamento' });
       await card.getByRole('button', { name: 'Atualizar' }).click();
@@ -295,11 +299,11 @@ test.describe('Tarefas', () => {
       await expect(newTaskForm(page)).toHaveCount(0);
 
       await tasksSection(page).getByRole('link', { name: 'Ver todas as tarefas' }).click();
-      await expect(page).toHaveURL(/\/dashboard$/);
+      await expect(page).toHaveURL(/\/dashboard\?view=tarefas&layout=list$/);
       await expect(allTaskCards(page)).toHaveCount(3);
 
       // Status desconhecido na URL mostra todas
-      await openDashboard(page, '?status=invalido');
+      await openView(page, 'tarefas', '&status=invalido');
       await expect(allTaskCards(page)).toHaveCount(3);
       await expect(filters.getByRole('link', { name: 'Todas' })).toHaveAttribute('aria-current', 'page');
     });
@@ -318,10 +322,10 @@ test.describe('Tarefas', () => {
           { employeeId: bruno.employeeId, leadershipLevel: 1 },
         ],
       });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       await taskCard(page, task.taskName).getByRole('button', { name: `Editar a tarefa ${task.taskName}` }).click();
-      const form = editTaskForm(page, task.taskName);
+      const form = editTaskForm(page);
 
       // Pré-preenchido com os dados atuais
       await expect(form.getByLabel('Nome da tarefa')).toHaveValue(task.taskName);
@@ -360,9 +364,9 @@ test.describe('Tarefas', () => {
 
       // Apagar a descrição remove o texto do card
       await card.getByRole('button', { name: `Editar a tarefa ${newName}` }).click();
-      await editTaskForm(page, newName).getByLabel('Descrição').fill('');
-      await editTaskForm(page, newName).getByRole('button', { name: 'Salvar' }).click();
-      await expect(editTaskForm(page, newName)).toHaveCount(0);
+      await editTaskForm(page).getByLabel('Descrição').fill('');
+      await editTaskForm(page).getByRole('button', { name: 'Salvar' }).click();
+      await expect(editTaskForm(page)).toHaveCount(0);
       await expect(card).not.toContainText('Descrição nova');
       expect((await api.getTask(company.leader.token, task.taskId))?.description).toBeNull();
     });
@@ -377,11 +381,11 @@ test.describe('Tarefas', () => {
           { employeeId: bruno.employeeId, leadershipLevel: 2 },
         ],
       });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       const card = taskCard(page, task.taskName);
       await card.getByRole('button', { name: `Editar a tarefa ${task.taskName}` }).click();
-      const form = editTaskForm(page, task.taskName);
+      const form = editTaskForm(page);
       await form.getByLabel('Nome da tarefa').fill(`${task.taskName} alterado`);
       for (const checkbox of await form.getByRole('checkbox').all()) await checkbox.uncheck();
       await form.getByRole('button', { name: 'Salvar' }).click();
@@ -411,7 +415,7 @@ test.describe('Tarefas', () => {
       const company = await api.createCompany();
       const keep = await api.createTask(company.leader.token, { taskName: `Manter ${uid()}` });
       const remove = await api.createTask(company.leader.token, { taskName: `Excluir ${uid()}` });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
       await expect(tasksCount(page)).toHaveText('2 tarefas');
 
       const card = taskCard(page, remove.taskName);
@@ -430,7 +434,7 @@ test.describe('Tarefas', () => {
       await expect(taskCard(page, keep.taskName)).toBeVisible();
       await expect(tasksCount(page)).toHaveText('1 tarefa');
 
-      await openDashboard(page);
+      await openView(page, 'tarefas');
       await expect(taskCard(page, remove.taskName)).toHaveCount(0);
       expect((await api.getTasks(company.leader.token)).map(task => task.taskId)).toEqual([keep.taskId]);
     });
@@ -452,7 +456,7 @@ test.describe('Tarefas', () => {
         ],
       });
       const notMine = await api.createTask(company.leader.token, { taskName: `Só da líder ${uid()}` });
-      await loginAs(bruno);
+      await loginAs(bruno, 'tarefas');
 
       // Nenhum controle de líder na página
       await expect(page.getByRole('button', { name: /^Editar a tarefa/ })).toHaveCount(0);
@@ -468,19 +472,18 @@ test.describe('Tarefas', () => {
       expect((await api.getTask(company.leader.token, mine.taskId))?.status).toBe('em_andamento');
 
       // Membro cria tarefa sem responsáveis: vira o principal e pode mudar o status
-      await tasksSection(page).getByRole('button', { name: 'Nova tarefa' }).click();
       const ownName = `Criada pelo Bruno ${uid()}`;
-      await newTaskForm(page).getByLabel('Nome da tarefa').fill(ownName);
-      await newTaskForm(page).getByRole('button', { name: 'Criar tarefa' }).click();
+      const ownForm = await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
+      await ownForm.getByLabel('Nome da tarefa').fill(ownName);
+      await ownForm.getByRole('button', { name: 'Criar tarefa' }).click();
       const ownCard = taskCard(page, ownName);
       await expect(responsibleChips(ownCard)).toHaveText([chip(bruno, 'Principal')]);
       await changeStatus(ownCard, 'Concluída');
       await expect(ownCard.getByRole('button', { name: /^(Editar|Excluir)/ })).toHaveCount(0);
 
       // Membro cria tarefa só para a líder: não pode mudar o status dela depois
-      await tasksSection(page).getByRole('button', { name: 'Nova tarefa' }).click();
       const forLeader = `Para a líder ${uid()}`;
-      const form = newTaskForm(page);
+      const form = await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
       await form.getByLabel('Nome da tarefa').fill(forLeader);
       await form.getByRole('checkbox', { name: new RegExp(`^${escapeRegExp(company.leader.name)}`) }).check();
       await form.getByRole('button', { name: 'Criar tarefa' }).click();
@@ -498,7 +501,7 @@ test.describe('Tarefas', () => {
         taskName: `Troca de responsável ${uid()}`,
         responsibles: [{ employeeId: bruno.employeeId, leadershipLevel: 3 }],
       });
-      await loginAs(bruno);
+      await loginAs(bruno, 'tarefas');
       const card = taskCard(page, task.taskName);
       await expect(card.getByRole('combobox', { name: 'Status da tarefa' })).toBeVisible();
 

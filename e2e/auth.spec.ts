@@ -2,7 +2,18 @@ import { expect, test } from './support/fixtures';
 import { person, uniqueCompanyName, uniqueEmail } from './support/data';
 import { AUTH_COOKIE, E2E_JWT_SECRET } from './support/env';
 import { contractPayload, signTestJwt } from './support/jwt';
-import { appAlert, loginViaUI, memberRow, sessionCookie, signIn, teamSection, visit, waitForHydration } from './support/ui';
+import {
+  appAlert,
+  loginViaUI,
+  memberRow,
+  membersSection,
+  openView,
+  sessionCookie,
+  signIn,
+  tasksSection,
+  visit,
+  waitForHydration,
+} from './support/ui';
 import type { Locator, Page } from '@playwright/test';
 
 const SESSION_EXPIRED = 'Sua sessão expirou. Faça login novamente.';
@@ -63,15 +74,18 @@ test.describe('Autenticação', () => {
       await expect(page.getByRole('heading', { level: 1, name: 'Olá, Lia' })).toBeVisible();
       await expect(page.getByRole('banner')).toContainText(company);
 
+      // O resumo é a primeira tela; a equipe fica na seção Membros
+      await openView(page, 'membros');
       const me = memberRow(page, leader.email);
       await expect(me).toContainText(leader.name);
       await expect(me).toContainText('(você)');
       await expect(me).toContainText('Líder');
-      await expect(teamSection(page).getByRole('heading', { name: 'Membros (1)' })).toBeVisible();
+      await expect(membersSection(page).getByRole('heading', { name: 'Membros (1)' })).toBeVisible();
       // Controle exclusivo do líder
-      await expect(page.getByLabel('Convidar por email')).toBeVisible();
-      // Sem tarefas: o formulário "Nova tarefa" já começa aberto
-      await expect(page.getByRole('form', { name: 'Nova tarefa' })).toBeVisible();
+      await expect(membersSection(page).getByRole('button', { name: 'Convidar membro' })).toBeVisible();
+      // Sem tarefas: a seção Tarefas mostra o aviso
+      await openView(page, 'tarefas');
+      await expect(tasksSection(page).getByText('Nenhuma tarefa por aqui ainda')).toBeVisible();
 
       // O JWT fica num cookie httpOnly + SameSite=Strict, invisível para o JavaScript da página
       const cookie = await sessionCookie(page.context());
@@ -178,6 +192,7 @@ test.describe('Autenticação', () => {
       await expect(page).toHaveURL(/\/dashboard$/);
       await expect(page.getByRole('heading', { level: 1, name: 'Olá, Lia' })).toBeVisible();
       await expect(page.getByRole('banner')).toContainText(company.name);
+      await openView(page, 'membros');
       await expect(memberRow(page, company.leader.email)).toContainText('(você)');
       expect(await sessionCookie(page.context())).toBeDefined();
     });
@@ -247,17 +262,18 @@ test.describe('Autenticação', () => {
       await expect(page.getByRole('heading', { level: 1, name: 'Olá, Bruno' })).toBeVisible();
       await expect(page.getByRole('banner')).toContainText(company.name);
 
+      await openView(page, 'membros');
       const me = memberRow(page, member.email);
       await expect(me).toContainText(member.name);
       await expect(me).toContainText(member.position);
       await expect(me).toContainText('(você)');
       await expect(me).toContainText('Membro');
       await expect(memberRow(page, company.leader.email)).toContainText('Líder');
-      await expect(teamSection(page).getByRole('heading', { name: 'Membros (2)' })).toBeVisible();
+      await expect(membersSection(page).getByRole('heading', { name: 'Membros (2)' })).toBeVisible();
       // O convite foi usado: não está mais pendente
-      await expect(teamSection(page).getByRole('heading', { name: 'Convites pendentes (0)' })).toBeVisible();
+      await expect(membersSection(page).getByRole('heading', { name: 'Convites pendentes (0)' })).toBeVisible();
       // Membro não convida
-      await expect(page.getByLabel('Convidar por email')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Convidar membro' })).toHaveCount(0);
 
       const employees = await api.getEmployees(company.leader.token);
       expect(employees.find(employee => employee.email === member.email)).toEqual(

@@ -35,6 +35,17 @@ export function getIntField(formData: FormData, field: string): number | null {
 }
 
 /**
+ * Monta a lista de membros (employeeId) a partir dos checkboxes "member" do formulário
+ */
+export function getMemberIds(formData: FormData): number[] {
+  const ids = formData
+    .getAll('member')
+    .map(value => Number(value))
+    .filter(employeeId => Number.isInteger(employeeId) && employeeId > 0);
+  return Array.from(new Set(ids));
+}
+
+/**
  * Monta a lista de responsáveis a partir do formulário
  * Espera checkboxes "responsible" (employeeId) e selects "level-<employeeId>" (1 a 3)
  */

@@ -41,7 +41,7 @@ const DELETE_TASK_MUTATION = `
 `;
 
 /**
- * Cria uma tarefa (qualquer membro)
+ * Cria uma tarefa (qualquer membro), com projeto opcional
  * Sem responsáveis selecionados, a API coloca o criador com nível 3
  */
 export async function createTaskAction(
@@ -50,6 +50,7 @@ export async function createTaskAction(
 ): Promise<ActionState> {
   const taskName = String(formData.get('taskName') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim();
+  const projectId = getIntField(formData, 'projectId');
   const responsibles = getResponsibles(formData);
 
   if (!taskName) return { error: 'Informe o nome da tarefa.' };
@@ -57,6 +58,7 @@ export async function createTaskAction(
   const task = {
     taskName,
     description: description || null,
+    projectId,
     ...(responsibles.length > 0 && { responsibles }),
   };
 
@@ -68,7 +70,7 @@ export async function createTaskAction(
 }
 
 /**
- * Edita nome, descrição e responsáveis de uma tarefa (só líder)
+ * Edita nome, descrição, projeto e responsáveis de uma tarefa (só líder)
  */
 export async function updateTaskAction(
   _prevState: ActionState,
@@ -77,6 +79,7 @@ export async function updateTaskAction(
   const taskId = getIntField(formData, 'taskId');
   const taskName = String(formData.get('taskName') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim();
+  const projectId = getIntField(formData, 'projectId');
   const responsibles = getResponsibles(formData);
 
   if (!taskId) return { error: 'Tarefa inválida.' };
@@ -85,7 +88,7 @@ export async function updateTaskAction(
 
   const { error } = await graphqlRequest(UPDATE_TASK_MUTATION, {
     taskId,
-    task: { taskName, description, responsibles },
+    task: { taskName, description, projectId, responsibles },
   });
   if (error) return toActionError(error);
 
@@ -104,6 +107,20 @@ export async function updateTaskStatusAction(
   const status = formData.get('status');
 
   if (!taskId) return { error: 'Tarefa inválida.' };
+  if (!isTaskStatus(status)) return { error: 'Status inválido.' };
+
+  const { error } = await graphqlRequest(UPDATE_TASK_STATUS_MUTATION, { taskId, status });
+  if (error) return toActionError(error);
+
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
+
+/**
+ * Muda o status de uma tarefa ao arrastar o card no kanban (líder ou responsável)
+ */
+export async function moveTaskAction(taskId: number, status: string): Promise<ActionState> {
+  if (!Number.isInteger(taskId) || taskId <= 0) return { error: 'Tarefa inválida.' };
   if (!isTaskStatus(status)) return { error: 'Status inválido.' };
 
   const { error } = await graphqlRequest(UPDATE_TASK_STATUS_MUTATION, { taskId, status });

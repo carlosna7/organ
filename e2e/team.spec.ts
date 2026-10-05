@@ -2,16 +2,18 @@ import { expect, test } from './support/fixtures';
 import { escapeRegExp, person, uid, uniqueEmail } from './support/data';
 import {
   appAlert,
+  inviteDialog,
   inviteRow,
   loginViaUI,
   memberRow,
+  membersSection,
   newTaskForm,
-  openDashboard,
+  openDialog,
+  openView,
   responsibleChips,
   sessionCookie,
   taskCard,
   tasksSection,
-  teamSection,
   waitForHydration,
   waitForServerAction,
 } from './support/ui';
@@ -20,31 +22,30 @@ import type { Page } from '@playwright/test';
 const SESSION_EXPIRED = 'Sua sessão expirou. Faça login novamente.';
 
 const membersHeading = (page: Page, count: number) =>
-  teamSection(page).getByRole('heading', { name: `Membros (${count})` });
+  membersSection(page).getByRole('heading', { name: `Membros (${count})` });
 const invitesHeading = (page: Page, count: number) =>
-  teamSection(page).getByRole('heading', { name: `Convites pendentes (${count})` });
+  membersSection(page).getByRole('heading', { name: `Convites pendentes (${count})` });
 
 test.describe('Equipe', () => {
   test.describe('Líder', () => {
     test('líder convida por email e o convite aparece como pendente', async ({ page, api, loginAs }) => {
       const company = await api.createCompany();
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'membros');
       const email = uniqueEmail('convidado');
 
       await expect(invitesHeading(page, 0)).toBeVisible();
       await expect(
-        teamSection(page).getByText('Nenhum convite pendente. Convide alguém pelo email para montar a equipe.')
+        membersSection(page).getByText('Nenhum convite pendente. Convide alguém pelo email para montar a equipe.')
       ).toBeVisible();
 
-      // Maiúsculas são normalizadas antes de gravar
-      const field = page.getByLabel('Convidar por email');
-      await field.fill(email.toUpperCase());
-      await page.getByRole('button', { name: 'Convidar', exact: true }).click();
+      // O convite é cadastrado numa janela; maiúsculas são normalizadas antes de gravar
+      const trigger = membersSection(page).getByRole('button', { name: 'Convidar membro' });
+      const dialog = await openDialog(page, trigger, 'Convidar membro');
+      await dialog.getByLabel('Email do convidado').fill(email.toUpperCase());
+      await dialog.getByRole('button', { name: 'Convidar', exact: true }).click();
 
-      await expect(teamSection(page).getByRole('status')).toHaveText(
-        'Convite registrado. A pessoa já pode se cadastrar com esse email.'
-      );
-      await expect(field).toHaveValue('');
+      // A janela fecha sozinha e o convite aparece como pendente
+      await expect(inviteDialog(page)).toHaveCount(0);
       await expect(inviteRow(page, email)).toBeVisible();
       await expect(invitesHeading(page, 1)).toBeVisible();
       // Convite não conta como membro
@@ -64,7 +65,7 @@ test.describe('Equipe', () => {
       const company = await api.createCompany();
       const pending = await api.addInvite(company);
       const other = await api.createCompany();
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'membros');
 
       const attempts = [
         // Passa na validação do navegador, mas não na do servidor (domínio sem ponto)
@@ -74,19 +75,23 @@ test.describe('Equipe', () => {
         { label: 'líder de outra empresa', email: other.leader.email, message: 'Email já está cadastrado!' },
       ];
 
+      const trigger = membersSection(page).getByRole('button', { name: 'Convidar membro' });
+      const dialog = await openDialog(page, trigger, 'Convidar membro');
       for (const attempt of attempts) {
         await test.step(attempt.label, async () => {
-          const button = page.getByRole('button', { name: 'Convidar', exact: true });
-          await page.getByLabel('Convidar por email').fill(attempt.email);
+          const button = dialog.getByRole('button', { name: 'Convidar', exact: true });
+          await dialog.getByLabel('Email do convidado').fill(attempt.email);
           const action = waitForServerAction(page);
           await button.click();
           await action;
           // Enquanto envia, o botão vira "Convidando..."; o nome "Convidar" volta quando a resposta foi aplicada
           await expect(button).toBeEnabled();
-          await expect(teamSection(page).getByRole('alert')).toHaveText(attempt.message);
-          await expect(teamSection(page).getByRole('status')).toHaveCount(0);
+          // A janela continua aberta com a mensagem de erro
+          await expect(dialog.getByRole('alert')).toHaveText(attempt.message);
         });
       }
+      await dialog.getByRole('button', { name: 'Cancelar' }).click();
+      await expect(inviteDialog(page)).toHaveCount(0);
 
       await expect(invitesHeading(page, 1)).toBeVisible();
       expect(await api.getEmployees(company.leader.token)).toHaveLength(2);
@@ -96,7 +101,7 @@ test.describe('Equipe', () => {
       const company = await api.createCompany();
       const keep = await api.addInvite(company);
       const cancel = await api.addInvite(company);
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'membros');
       await expect(invitesHeading(page, 2)).toBeVisible();
 
       const row = inviteRow(page, cancel.email);
@@ -140,7 +145,7 @@ test.describe('Equipe', () => {
         taskName: `Tarefa só do Bruno ${uid()}`,
         responsibles: [{ employeeId: bruno.employeeId, leadershipLevel: 3 }],
       });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'tarefas');
 
       const sharedCard = taskCard(page, shared.taskName);
       await expect(responsibleChips(sharedCard)).toHaveText([
@@ -148,6 +153,8 @@ test.describe('Equipe', () => {
         new RegExp(`${escapeRegExp(bruno.name)}\\s*· Apoio$`),
         new RegExp(`${escapeRegExp(carla.name)}\\s*· Acompanha$`),
       ]);
+
+      await openView(page, 'membros');
       await expect(membersHeading(page, 3)).toBeVisible();
 
       const row = memberRow(page, bruno.email);
@@ -164,7 +171,9 @@ test.describe('Equipe', () => {
       await expect(memberRow(page, bruno.email)).toHaveCount(0);
       await expect(membersHeading(page, 2)).toBeVisible();
       await expect(memberRow(page, carla.email)).toBeVisible();
+
       // Saiu dos responsáveis de todas as tarefas
+      await openView(page, 'tarefas');
       await expect(responsibleChips(sharedCard)).toHaveText([
         new RegExp(`${escapeRegExp(company.leader.name)}\\s*· Principal$`),
         new RegExp(`${escapeRegExp(carla.name)}\\s*· Acompanha$`),
@@ -172,7 +181,7 @@ test.describe('Equipe', () => {
       await expect(responsibleChips(taskCard(page, onlyBruno.taskName))).toHaveCount(0);
       await expect(tasksSection(page)).not.toContainText(bruno.name);
       // E não aparece mais para ser escolhido como responsável
-      await tasksSection(page).getByRole('button', { name: 'Nova tarefa' }).click();
+      await openDialog(page, tasksSection(page).getByRole('button', { name: 'Nova tarefa' }), 'Nova tarefa');
       await expect(newTaskForm(page).getByRole('checkbox', { name: new RegExp(escapeRegExp(bruno.name)) })).toHaveCount(0);
       await expect(newTaskForm(page).getByRole('checkbox', { name: new RegExp(escapeRegExp(carla.name)) })).toBeVisible();
 
@@ -189,7 +198,7 @@ test.describe('Equipe', () => {
       const company = await api.createCompany();
       const bruno = await api.addMember(company, { firstName: 'Bruno' });
       const carla = await api.addMember(company, { firstName: 'Carla' });
-      await loginAs(company.leader);
+      await loginAs(company.leader, 'membros');
 
       const me = memberRow(page, company.leader.email);
       await expect(me).toContainText('(você)');
@@ -199,7 +208,7 @@ test.describe('Equipe', () => {
       // Os outros membros têm o botão
       await expect(memberRow(page, bruno.email).getByRole('button', { name: `Remover ${bruno.name}` })).toBeVisible();
       await expect(memberRow(page, carla.email).getByRole('button', { name: `Remover ${carla.name}` })).toBeVisible();
-      await expect(teamSection(page).getByRole('button', { name: /^Remover / })).toHaveCount(2);
+      await expect(membersSection(page).getByRole('button', { name: /^Remover / })).toHaveCount(2);
     });
   });
 
@@ -208,21 +217,20 @@ test.describe('Equipe', () => {
       const company = await api.createCompany();
       const bruno = await api.addMember(company, { firstName: 'Bruno' });
       const carla = await api.addMember(company, { firstName: 'Carla' });
-      await loginAs(bruno);
+      await loginAs(bruno, 'membros');
 
-      const team = teamSection(page);
+      const team = membersSection(page);
       await expect(memberRow(page, bruno.email)).toContainText('Membro');
       await expect(memberRow(page, company.leader.email)).toContainText('Líder');
       await expect(memberRow(page, carla.email)).toBeVisible();
-      await expect(page.getByLabel('Convidar por email')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Convidar', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Convidar membro' })).toHaveCount(0);
       await expect(team.getByRole('button')).toHaveCount(0);
       // Sem convites: o texto do membro não sugere convidar
       await expect(team.getByText('Nenhum convite pendente.', { exact: true })).toBeVisible();
 
       // Com um convite pendente, o membro vê o convite, mas não pode cancelá-lo
       const invite = await api.addInvite(company);
-      await openDashboard(page);
+      await openView(page, 'membros');
       await expect(inviteRow(page, invite.email)).toBeVisible();
       await expect(invitesHeading(page, 1)).toBeVisible();
       await expect(team.getByRole('button')).toHaveCount(0);
@@ -240,10 +248,10 @@ test.describe('Equipe', () => {
         // Bruno entra pela tela de login (cookie gravado pelo próprio app)
         await loginViaUI(page, bruno.email, bruno.password);
         await expect(page.getByRole('heading', { level: 1, name: 'Olá, Bruno' })).toBeVisible();
-        await waitForHydration(page);
+        await openView(page, 'tarefas');
 
         // O líder remove o Bruno em outro navegador
-        const leaderPage = await openSession(company.leader);
+        const leaderPage = await openSession(company.leader, 'membros');
         const row = memberRow(leaderPage, bruno.email);
         await row.getByRole('button', { name: `Remover ${bruno.name}`, exact: true }).click();
         await row.getByRole('button', { name: `Confirmar remoção de ${bruno.name}` }).click();

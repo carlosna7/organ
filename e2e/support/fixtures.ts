@@ -1,14 +1,14 @@
 import { test as base, type BrowserContext, type Page } from '@playwright/test';
 import { OrganApi, type Account } from './api';
-import { openDashboard, signIn } from './ui';
+import { openDashboard, openView, signIn, type DashboardView } from './ui';
 
 type Fixtures = {
   /** Cliente da organ-api para preparar estado (empresa, convites, tarefas) */
   api: OrganApi;
-  /** Loga a conta na página principal do teste (cookie de sessão) e abre o dashboard */
-  loginAs: (account: Account, page?: Page) => Promise<Page>;
-  /** Abre outro navegador (contexto isolado) já logado com a conta, no dashboard */
-  openSession: (account: Account) => Promise<Page>;
+  /** Loga a conta na página principal do teste (cookie de sessão) e abre uma seção do dashboard (padrão: resumo) */
+  loginAs: (account: Account, view?: DashboardView, page?: Page) => Promise<Page>;
+  /** Abre outro navegador (contexto isolado) já logado com a conta, numa seção do dashboard (padrão: resumo) */
+  openSession: (account: Account, view?: DashboardView) => Promise<Page>;
 };
 
 export const test = base.extend<Fixtures>({
@@ -17,22 +17,22 @@ export const test = base.extend<Fixtures>({
   },
 
   loginAs: async ({ page: defaultPage }, use) => {
-    await use(async (account, page = defaultPage) => {
+    await use(async (account, view = 'resumo', page = defaultPage) => {
       await signIn(page.context(), account);
-      await openDashboard(page);
+      await (view === 'resumo' ? openDashboard(page) : openView(page, view));
       return page;
     });
   },
 
   openSession: async ({ browser }, use) => {
     const contexts: BrowserContext[] = [];
-    await use(async account => {
+    await use(async (account, view = 'resumo') => {
       // As opções do projeto (baseURL, locale, viewport...) também valem para contextos novos
       const context = await browser.newContext();
       contexts.push(context);
       await signIn(context, account);
       const page = await context.newPage();
-      await openDashboard(page);
+      await (view === 'resumo' ? openDashboard(page) : openView(page, view));
       return page;
     });
     await Promise.all(contexts.map(context => context.close()));
