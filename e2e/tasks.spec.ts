@@ -168,10 +168,6 @@ test.describe('Tarefas', () => {
 
   test.describe('Formulários reabertos', () => {
     test('reabrir "Nova tarefa" não mostra o erro da tentativa anterior', async ({ page, api, loginAs }) => {
-      // BUG: o estado do useFormState fica em CreateTaskForm, que continua montado com o formulário
-      // fechado; ao cancelar e reabrir, o formulário vazio mostra o erro antigo ("Informe o nome da tarefa.").
-      // Provável arquivo: src/components/dashboard/CreateTaskForm.tsx
-      test.fail();
       const company = await api.createCompany();
       await api.createTask(company.leader.token, { taskName: `Existente ${uid()}` });
       await loginAs(company.leader);
@@ -192,10 +188,6 @@ test.describe('Tarefas', () => {
     });
 
     test('reabrir "Editar" não mostra o erro da tentativa anterior', async ({ page, api, loginAs }) => {
-      // BUG: o estado do useFormState fica em TaskEditForm, que continua montado com o formulário
-      // fechado; ao cancelar e reabrir, o formulário (de novo com os dados da tarefa) mostra o erro
-      // antigo ("Selecione ao menos um responsável."). Provável arquivo: src/components/dashboard/TaskEditForm.tsx
-      test.fail();
       const company = await api.createCompany();
       const task = await api.createTask(company.leader.token, { taskName: `Editar ${uid()}` });
       await loginAs(company.leader);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useFormState } from 'react-dom';
 import { LuPencil } from 'react-icons/lu';
 import { updateTaskAction } from '@/actions/tasks';
@@ -18,7 +18,6 @@ type TaskEditFormProps = {
 
 // Edição de nome, descrição e responsáveis (só líder)
 export default function TaskEditForm({ task, employees }: TaskEditFormProps) {
-  const [state, formAction] = useFormState(updateTaskAction, {});
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -41,13 +40,11 @@ export default function TaskEditForm({ task, employees }: TaskEditFormProps) {
     setOpen(next);
   };
 
-  // Fecha o formulário após salvar
-  useEffect(() => {
-    if (state.ok) {
-      moveFocus.current = true;
-      setOpen(false);
-    }
-  }, [state]);
+  // Identidade estável: o efeito do subcomponente não reexecuta a cada render do pai
+  const close = useCallback(() => {
+    moveFocus.current = true;
+    setOpen(false);
+  }, []);
 
   if (!open) {
     return (
@@ -63,6 +60,32 @@ export default function TaskEditForm({ task, employees }: TaskEditFormProps) {
       </button>
     );
   }
+
+  return (
+    <TaskEditFormFields
+      task={task}
+      employees={employees}
+      formRef={formRef}
+      onSaved={close}
+      onCancel={close}
+    />
+  );
+}
+
+type TaskEditFormFieldsProps = TaskEditFormProps & {
+  formRef: RefObject<HTMLFormElement>;
+  onSaved: () => void;
+  onCancel: () => void;
+};
+
+// Formulário aberto: o useFormState vive aqui (e some ao fechar), então o erro da tentativa anterior não volta ao reabrir
+function TaskEditFormFields({ task, employees, formRef, onSaved, onCancel }: TaskEditFormFieldsProps) {
+  const [state, formAction] = useFormState(updateTaskAction, {});
+
+  // Fecha o formulário após salvar
+  useEffect(() => {
+    if (state.ok) onSaved();
+  }, [state, onSaved]);
 
   // Níveis atuais dos responsáveis para pré-selecionar
   const selected: Record<number, number> = {};
@@ -105,7 +128,7 @@ export default function TaskEditForm({ task, employees }: TaskEditFormProps) {
         <SubmitButton size="sm" pendingText="Salvando...">
           Salvar
         </SubmitButton>
-        <Button variant="ghost" size="sm" onClick={() => toggle(false)}>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancelar
         </Button>
       </div>

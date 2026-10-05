@@ -147,10 +147,6 @@ test.describe('Layout no celular (sem overflow horizontal)', () => {
 
     for (const { path, name } of publicPages) {
       test(`sem overflow horizontal em 320px: ${name}`, async ({ page }) => {
-        // BUG: em 320px o cabeçalho da landing (logo + "Entrar" + "Criar empresa", com shrink-0 e
-        // whitespace-nowrap) fica ~2px mais largo que a tela: a página rola na horizontal e o botão
-        // "Criar empresa" encosta/corta na borda direita. Provável arquivo: src/components/main/MainHeader.tsx
-        test.fail(path === '/', 'BUG: cabeçalho da landing passa da largura da tela em 320px');
         await visit(page, path);
         await expectNoHorizontalOverflow(page, `${name} em 320px`);
       });

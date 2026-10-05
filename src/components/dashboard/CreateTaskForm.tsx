@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useFormState } from 'react-dom';
 import { LuPlus } from 'react-icons/lu';
 import { createTaskAction } from '@/actions/tasks';
@@ -19,7 +19,6 @@ type CreateTaskFormProps = {
 
 // Formulário para criar tarefa (qualquer membro)
 export default function CreateTaskForm({ employees, defaultOpen = false }: CreateTaskFormProps) {
-  const [state, formAction] = useFormState(createTaskAction, {});
   const [open, setOpen] = useState(defaultOpen);
   const formRef = useRef<HTMLFormElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -42,15 +41,6 @@ export default function CreateTaskForm({ employees, defaultOpen = false }: Creat
     setOpen(next);
   };
 
-  // Limpa e fecha o formulário após criar a tarefa
-  useEffect(() => {
-    if (state.ok) {
-      formRef.current?.reset();
-      moveFocus.current = true;
-      setOpen(false);
-    }
-  }, [state]);
-
   if (!open) {
     return (
       <div>
@@ -61,6 +51,31 @@ export default function CreateTaskForm({ employees, defaultOpen = false }: Creat
       </div>
     );
   }
+
+  return (
+    <CreateTaskFormFields
+      employees={employees}
+      formRef={formRef}
+      onCreated={() => toggle(false)}
+      onCancel={() => toggle(false)}
+    />
+  );
+}
+
+type CreateTaskFormFieldsProps = Pick<CreateTaskFormProps, 'employees'> & {
+  formRef: RefObject<HTMLFormElement>;
+  onCreated: () => void;
+  onCancel: () => void;
+};
+
+// Formulário aberto: o useFormState vive aqui (e some ao fechar), então o erro da tentativa anterior não volta ao reabrir
+function CreateTaskFormFields({ employees, formRef, onCreated, onCancel }: CreateTaskFormFieldsProps) {
+  const [state, formAction] = useFormState(createTaskAction, {});
+
+  // Fecha o formulário após criar a tarefa
+  useEffect(() => {
+    if (state.ok) onCreated();
+  }, [state, onCreated]);
 
   return (
     <form
@@ -86,7 +101,7 @@ export default function CreateTaskForm({ employees, defaultOpen = false }: Creat
 
       <div className="flex flex-wrap gap-2">
         <SubmitButton pendingText="Criando...">Criar tarefa</SubmitButton>
-        <Button variant="ghost" onClick={() => toggle(false)}>
+        <Button variant="ghost" onClick={onCancel}>
           Cancelar
         </Button>
       </div>

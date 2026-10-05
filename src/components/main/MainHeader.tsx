@@ -14,7 +14,8 @@ const MainHeader = () => {
     <header className='sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur'>
       <div className='mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6'>
         <Link href='/' aria-label='Organ, página inicial' className='rounded-lg'>
-          <Logo />
+          {/* Abaixo de sm só a marca, para o cabeçalho caber em 320px; o nome fica no aria-label do link */}
+          <Logo className='max-sm:[&>span]:hidden' />
         </Link>
 
         <nav aria-label='Seções da página' className='hidden md:block'>
